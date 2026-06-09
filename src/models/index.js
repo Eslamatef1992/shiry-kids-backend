@@ -14,7 +14,7 @@ const Admin = sequelize.define('Admin', {
   name:     { type: DataTypes.STRING, allowNull: false },
   email:    { type: DataTypes.STRING, allowNull: false, unique: true },
   password: { type: DataTypes.STRING, allowNull: false },
-  role_id:  { type: DataTypes.INTEGER, references: { model: 'Roles', key: 'id' } },
+  role_id:  { type: DataTypes.INTEGER, references: { model: 'roles', key: 'id' } },
   status:   { type: DataTypes.ENUM('active','inactive'), defaultValue: 'active' },
   avatar:   { type: DataTypes.STRING, allowNull: true },
 });
@@ -47,15 +47,15 @@ const Category = sequelize.define('Category', {
   id:        { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   name:      { type: DataTypes.STRING, allowNull: false },
   image:     { type: DataTypes.STRING, allowNull: true },
-  parent_id: { type: DataTypes.INTEGER, allowNull: true, references: { model: 'Categories', key: 'id' } },
+  parent_id: { type: DataTypes.INTEGER, allowNull: true, references: { model: 'categories', key: 'id' } },
   sort:      { type: DataTypes.INTEGER, defaultValue: 0 },
 });
 
 // ── Product ───────────────────────────────────────────────────────────────────
 const Product = sequelize.define('Product', {
   id:             { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  vendor_id:      { type: DataTypes.INTEGER, references: { model: 'Vendors', key: 'id' } },
-  category_id:    { type: DataTypes.INTEGER, references: { model: 'Categories', key: 'id' } },
+  vendor_id:      { type: DataTypes.INTEGER, references: { model: 'vendors', key: 'id' } },
+  category_id:    { type: DataTypes.INTEGER, references: { model: 'categories', key: 'id' } },
   name:           { type: DataTypes.STRING, allowNull: false },
   description:    { type: DataTypes.TEXT, allowNull: true },
   price:          { type: DataTypes.DECIMAL(10,3), allowNull: false },
@@ -74,7 +74,7 @@ const Product = sequelize.define('Product', {
 // ── Coupon (brand coupons sold in app) ────────────────────────────────────────
 const Coupon = sequelize.define('Coupon', {
   id:              { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  vendor_id:       { type: DataTypes.INTEGER, references: { model: 'Vendors', key: 'id' } },
+  vendor_id:       { type: DataTypes.INTEGER, references: { model: 'vendors', key: 'id' } },
   title:           { type: DataTypes.STRING, allowNull: false },
   description:     { type: DataTypes.TEXT, allowNull: true },
   image:           { type: DataTypes.STRING, allowNull: true },
@@ -104,7 +104,7 @@ const DiscountCoupon = sequelize.define('DiscountCoupon', {
 const Order = sequelize.define('Order', {
   id:             { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   order_number:   { type: DataTypes.STRING, allowNull: false, unique: true },
-  user_id:        { type: DataTypes.INTEGER, references: { model: 'Users', key: 'id' } },
+  user_id:        { type: DataTypes.INTEGER, references: { model: 'users', key: 'id' } },
   items:          { type: DataTypes.JSON, allowNull: false },
   subtotal:       { type: DataTypes.DECIMAL(10,3), allowNull: false },
   discount:       { type: DataTypes.DECIMAL(10,3), defaultValue: 0 },
@@ -141,7 +141,7 @@ const GuestOrder = sequelize.define('GuestOrder', {
 // ── QR Scan Log ───────────────────────────────────────────────────────────────
 const QrScanLog = sequelize.define('QrScanLog', {
   id:         { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  admin_id:   { type: DataTypes.INTEGER, references: { model: 'Admins', key: 'id' } },
+  admin_id:   { type: DataTypes.INTEGER, references: { model: 'admins', key: 'id' } },
   qr_code:    { type: DataTypes.STRING, allowNull: false },
   order_id:   { type: DataTypes.INTEGER, allowNull: true },
   order_type: { type: DataTypes.ENUM('order','guest_order'), allowNull: true },
