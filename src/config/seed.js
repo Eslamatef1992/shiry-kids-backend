@@ -5,7 +5,9 @@ const { sequelize, Role, Admin, Setting, SeoPage } = require('../models');
 (async () => {
   try {
     await sequelize.authenticate();
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
     await sequelize.sync();
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
 
     // Seed roles
     const superAdmin = await Role.findOrCreate({
