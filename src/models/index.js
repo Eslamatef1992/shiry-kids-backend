@@ -155,6 +155,17 @@ const QrScanLog = sequelize.define('QrScanLog', {
   status:     { type: DataTypes.ENUM('valid','used','not_found'), allowNull: false },
 });
 
+// ── Banner ────────────────────────────────────────────────────────────────────
+const Banner = sequelize.define('Banner', {
+  id:       { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  title:    { type: DataTypes.STRING, allowNull: true },
+  title_ar: { type: DataTypes.STRING, allowNull: true },
+  image:    { type: DataTypes.STRING, allowNull: false },
+  link:     { type: DataTypes.STRING, allowNull: true },
+  sort:     { type: DataTypes.INTEGER, defaultValue: 0 },
+  status:   { type: DataTypes.ENUM('active','inactive'), defaultValue: 'active' },
+});
+
 // ── Setting ───────────────────────────────────────────────────────────────────
 const Setting = sequelize.define('Setting', {
   id:    { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -208,5 +219,5 @@ module.exports = {
   Role, Admin, User, Vendor, Category,
   Product, Coupon, DiscountCoupon,
   Order, GuestOrder, QrScanLog,
-  Setting, SeoPage, CmsPage,
+  Setting, SeoPage, CmsPage, Banner,
 };

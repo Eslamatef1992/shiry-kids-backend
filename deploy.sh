@@ -78,8 +78,8 @@ nginx -t && systemctl reload nginx
 
 # ── SSL certificates (Certbot) ────────────────────────────────────────────────
 echo "==> Obtaining SSL certificates..."
-certbot --nginx -d back.shirykids.com  --non-interactive --agree-tos -m admin@shirykids.com
-certbot --nginx -d admin.shirykids.com --non-interactive --agree-tos -m admin@shirykids.com
+certbot --nginx -d back.shirykids.com  --non-interactive --agree-tos -m eslam@teknulugy.com
+certbot --nginx -d admin.shirykids.com --non-interactive --agree-tos -m eslam@teknulugy.com
 
 systemctl reload nginx
 
