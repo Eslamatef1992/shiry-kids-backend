@@ -33,19 +33,22 @@ const User = sequelize.define('User', {
 
 // ── Vendor ────────────────────────────────────────────────────────────────────
 const Vendor = sequelize.define('Vendor', {
-  id:          { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  name:        { type: DataTypes.STRING, allowNull: false },
-  email:       { type: DataTypes.STRING, allowNull: false, unique: true },
-  phone:       { type: DataTypes.STRING, allowNull: true },
-  logo:        { type: DataTypes.STRING, allowNull: true },
-  description: { type: DataTypes.TEXT, allowNull: true },
-  status:      { type: DataTypes.ENUM('active','inactive','pending'), defaultValue: 'pending' },
+  id:             { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name:           { type: DataTypes.STRING, allowNull: false },
+  name_ar:        { type: DataTypes.STRING, allowNull: true },
+  email:          { type: DataTypes.STRING, allowNull: false, unique: true },
+  phone:          { type: DataTypes.STRING, allowNull: true },
+  logo:           { type: DataTypes.STRING, allowNull: true },
+  description:    { type: DataTypes.TEXT, allowNull: true },
+  description_ar: { type: DataTypes.TEXT, allowNull: true },
+  status:         { type: DataTypes.ENUM('active','inactive','pending'), defaultValue: 'pending' },
 });
 
 // ── Category ──────────────────────────────────────────────────────────────────
 const Category = sequelize.define('Category', {
   id:        { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   name:      { type: DataTypes.STRING, allowNull: false },
+  name_ar:   { type: DataTypes.STRING, allowNull: true },
   image:     { type: DataTypes.STRING, allowNull: true },
   parent_id: { type: DataTypes.INTEGER, allowNull: true, references: { model: 'categories', key: 'id' } },
   sort:      { type: DataTypes.INTEGER, defaultValue: 0 },
@@ -57,7 +60,9 @@ const Product = sequelize.define('Product', {
   vendor_id:      { type: DataTypes.INTEGER, references: { model: 'vendors', key: 'id' } },
   category_id:    { type: DataTypes.INTEGER, references: { model: 'categories', key: 'id' } },
   name:           { type: DataTypes.STRING, allowNull: false },
+  name_ar:        { type: DataTypes.STRING, allowNull: true },
   description:    { type: DataTypes.TEXT, allowNull: true },
+  description_ar: { type: DataTypes.TEXT, allowNull: true },
   price:          { type: DataTypes.DECIMAL(10,3), allowNull: false },
   original_price: { type: DataTypes.DECIMAL(10,3), allowNull: true },
   stock:          { type: DataTypes.INTEGER, defaultValue: 0 },
@@ -76,7 +81,9 @@ const Coupon = sequelize.define('Coupon', {
   id:              { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   vendor_id:       { type: DataTypes.INTEGER, references: { model: 'vendors', key: 'id' } },
   title:           { type: DataTypes.STRING, allowNull: false },
+  title_ar:        { type: DataTypes.STRING, allowNull: true },
   description:     { type: DataTypes.TEXT, allowNull: true },
+  description_ar:  { type: DataTypes.TEXT, allowNull: true },
   image:           { type: DataTypes.STRING, allowNull: true },
   price:           { type: DataTypes.DECIMAL(10,3), allowNull: false },
   original_price:  { type: DataTypes.DECIMAL(10,3), allowNull: true },
@@ -170,12 +177,14 @@ const SeoPage = sequelize.define('SeoPage', {
 
 // ── CMS Page ──────────────────────────────────────────────────────────────────
 const CmsPage = sequelize.define('CmsPage', {
-  id:      { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  slug:    { type: DataTypes.STRING, allowNull: false, unique: true },
-  title:   { type: DataTypes.STRING, allowNull: false },
-  content: { type: DataTypes.TEXT('long'), allowNull: true },
-  status:  { type: DataTypes.ENUM('published','draft'), defaultValue: 'published' },
-  sort:    { type: DataTypes.INTEGER, defaultValue: 0 },
+  id:         { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  slug:       { type: DataTypes.STRING, allowNull: false, unique: true },
+  title:      { type: DataTypes.STRING, allowNull: false },
+  title_ar:   { type: DataTypes.STRING, allowNull: true },
+  content:    { type: DataTypes.TEXT('long'), allowNull: true },
+  content_ar: { type: DataTypes.TEXT('long'), allowNull: true },
+  status:     { type: DataTypes.ENUM('published','draft'), defaultValue: 'published' },
+  sort:       { type: DataTypes.INTEGER, defaultValue: 0 },
 });
 
 // ── Associations ──────────────────────────────────────────────────────────────
