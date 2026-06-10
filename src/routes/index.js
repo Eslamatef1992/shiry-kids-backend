@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { adminAuth, userAuth } = require('../middleware/auth');
+const { adminAuth, userAuth, optionalUserAuth } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 
 const auth     = require('../controllers/auth.controller');
@@ -15,6 +15,7 @@ const cms      = require('../controllers/cms.controller');
 const category = require('../controllers/category.controller');
 const banner   = require('../controllers/banner.controller');
 const ad       = require('../controllers/ad.controller');
+const notification = require('../controllers/notification.controller');
 
 // ── Public ────────────────────────────────────────────────────────────────────
 router.post('/auth/admin/login',    auth.adminLogin);
@@ -28,6 +29,9 @@ router.get ('/categories',          category.list);
 router.get ('/categories/:id',      category.get);
 router.get ('/banners',             banner.list);
 router.get ('/ads',                 ad.list);
+
+// Push notification device token registration (works for guests too)
+router.post('/notifications/register-token', optionalUserAuth, notification.registerToken);
 
 // ── User authenticated ────────────────────────────────────────────────────────
 router.get ('/auth/me',             userAuth, auth.me);
@@ -119,5 +123,9 @@ router.get   ('/ads/:id',           adminAuth, ad.get);
 router.post  ('/ads',               adminAuth, upload.single('image'), ad.create);
 router.put   ('/ads/:id',           adminAuth, upload.single('image'), ad.update);
 router.delete('/ads/:id',           adminAuth, ad.remove);
+
+// Push notifications (admin)
+router.get ('/notifications',       adminAuth, notification.list);
+router.post('/notifications/send',  adminAuth, upload.single('image'), notification.send);
 
 module.exports = router;

@@ -226,6 +226,29 @@ const CmsPage = sequelize.define('CmsPage', {
   sort:       { type: DataTypes.INTEGER, defaultValue: 0 },
 });
 
+// ── Device Token (for push notifications) ─────────────────────────────────────
+const DeviceToken = sequelize.define('DeviceToken', {
+  id:       { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  user_id:  { type: DataTypes.INTEGER, allowNull: true, references: { model: 'users', key: 'id' } },
+  token:    { type: DataTypes.STRING(512), allowNull: false, unique: true },
+  platform: { type: DataTypes.ENUM('ios','android','web'), allowNull: true },
+});
+
+// ── Push Notification (sent by admin) ──────────────────────────────────────────
+const PushNotification = sequelize.define('PushNotification', {
+  id:          { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  title:       { type: DataTypes.STRING, allowNull: false },
+  title_ar:    { type: DataTypes.STRING, allowNull: true },
+  body:        { type: DataTypes.TEXT, allowNull: false },
+  body_ar:     { type: DataTypes.TEXT, allowNull: true },
+  image:       { type: DataTypes.STRING, allowNull: true },
+  link_type:   { type: DataTypes.ENUM('none','product','coupon','external'), defaultValue: 'none' },
+  link_target: { type: DataTypes.STRING, allowNull: true },
+  recipients:  { type: DataTypes.INTEGER, defaultValue: 0 },
+  sent_count:  { type: DataTypes.INTEGER, defaultValue: 0 },
+  admin_id:    { type: DataTypes.INTEGER, allowNull: true, references: { model: 'admins', key: 'id' } },
+});
+
 // ── Associations ──────────────────────────────────────────────────────────────
 Admin.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
 Role.hasMany(Admin, { foreignKey: 'role_id' });
@@ -248,10 +271,14 @@ QrScanLog.belongsTo(Admin, { foreignKey: 'admin_id', as: 'admin' });
 Ad.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
 Ad.belongsTo(Coupon, { foreignKey: 'coupon_id', as: 'coupon' });
 
+DeviceToken.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+PushNotification.belongsTo(Admin, { foreignKey: 'admin_id', as: 'admin' });
+
 module.exports = {
   sequelize,
   Role, Admin, User, Vendor, Category,
   Product, ProductVariant, Coupon, DiscountCoupon,
   Order, GuestOrder, QrScanLog,
   Setting, SeoPage, CmsPage, Banner, Ad,
+  DeviceToken, PushNotification,
 };

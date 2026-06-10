@@ -1,29 +1,55 @@
-const { Order, GuestOrder, User, DiscountCoupon } = require('../models');
+const { Order, GuestOrder, User, DiscountCoupon, Product, Coupon } = require('../models');
 const { paginate, paginateResponse, generateOrderNumber, generateQRCode } = require('../utils/helpers');
 const { Op } = require('sequelize');
+
+// Resolve client-supplied items ({id, type, qty}) into priced line items using
+// authoritative DB prices (Product or Coupon), and compute the subtotal.
+async function resolveOrderItems(items) {
+  const resolved = [];
+  let subtotal = 0;
+  for (const it of (Array.isArray(items) ? items : [])) {
+    const qty = Math.max(1, parseInt(it.qty ?? it.quantity ?? 1, 10) || 1);
+    if (it.type === 'coupon') {
+      const c = await Coupon.findByPk(it.id);
+      if (!c) continue;
+      const price = parseFloat(c.price);
+      const lineTotal = price * qty;
+      subtotal += lineTotal;
+      resolved.push({ id: c.id, type: 'coupon', name: c.title, image: c.image, price, quantity: qty, total: lineTotal });
+    } else {
+      const p = await Product.findByPk(it.id);
+      if (!p) continue;
+      const price = parseFloat(p.price);
+      const lineTotal = price * qty;
+      subtotal += lineTotal;
+      resolved.push({ id: p.id, type: 'product', name: p.name, image: (p.images && p.images[0]) || null, price, quantity: qty, total: lineTotal });
+    }
+  }
+  return { resolved, subtotal };
+}
 
 exports.createOrder = async (req, res) => {
   try {
     const { items, payment_method, discount_code, address } = req.body;
+    const { resolved, subtotal } = await resolveOrderItems(items);
+    if (resolved.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid items found in order' });
+    }
     let discount = 0;
     if (discount_code) {
       const dc = await DiscountCoupon.findOne({ where: { code: discount_code, status: 'active' } });
-      if (dc) {
-        const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-        if (subtotal >= dc.min_order) {
-          discount = dc.type === 'percentage' ? subtotal * dc.value / 100 : dc.value;
-          await dc.increment('used_count');
-        }
+      if (dc && subtotal >= parseFloat(dc.min_order)) {
+        discount = dc.type === 'percentage' ? subtotal * parseFloat(dc.value) / 100 : parseFloat(dc.value);
+        await dc.increment('used_count');
       }
     }
-    const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
     const delivery_fees = 1.5;
     const total = subtotal - discount + delivery_fees;
     const order_number = generateOrderNumber();
     const qr_data = `SHIRY-ORDER-${order_number}`;
     const qr_code = await generateQRCode(qr_data);
     const order = await Order.create({
-      order_number, user_id: req.user.id, items, subtotal, discount,
+      order_number, user_id: req.user.id, items: resolved, subtotal, discount,
       delivery_fees, total, payment_method, discount_code, qr_code,
     });
     res.status(201).json({ success: true, data: { ...order.toJSON(), qr_data } });
@@ -33,13 +59,26 @@ exports.createOrder = async (req, res) => {
 exports.createGuestOrder = async (req, res) => {
   try {
     const { name, phone, address, items, payment_method, discount_code } = req.body;
+    const { resolved, subtotal } = await resolveOrderItems(items);
+    if (resolved.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid items found in order' });
+    }
     let discount = 0;
-    const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
+    if (discount_code) {
+      const dc = await DiscountCoupon.findOne({ where: { code: discount_code, status: 'active' } });
+      if (dc && subtotal >= parseFloat(dc.min_order)) {
+        discount = dc.type === 'percentage' ? subtotal * parseFloat(dc.value) / 100 : parseFloat(dc.value);
+        await dc.increment('used_count');
+      }
+    }
     const delivery_fees = 1.5;
     const total = subtotal - discount + delivery_fees;
     const order_number = generateOrderNumber();
     const qr_code = await generateQRCode(`SHIRY-ORDER-${order_number}`);
-    const order = await GuestOrder.create({ order_number, name, phone, address, items, subtotal, discount, delivery_fees, total, payment_method, discount_code, qr_code });
+    const order = await GuestOrder.create({
+      order_number, name: name || 'Guest', phone: phone || 'N/A', address: address || 'N/A',
+      items: resolved, subtotal, discount, delivery_fees, total, payment_method, discount_code, qr_code,
+    });
     res.status(201).json({ success: true, data: order });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
