@@ -14,6 +14,7 @@ const seo      = require('../controllers/seo.controller');
 const cms      = require('../controllers/cms.controller');
 const category = require('../controllers/category.controller');
 const banner   = require('../controllers/banner.controller');
+const ad       = require('../controllers/ad.controller');
 
 // ── Public ────────────────────────────────────────────────────────────────────
 router.post('/auth/admin/login',    auth.adminLogin);
@@ -26,6 +27,7 @@ router.get ('/discount-coupons/validate/:code', dc.validate);
 router.get ('/categories',          category.list);
 router.get ('/categories/:id',      category.get);
 router.get ('/banners',             banner.list);
+router.get ('/ads',                 ad.list);
 
 // ── User authenticated ────────────────────────────────────────────────────────
 router.get ('/auth/me',             userAuth, auth.me);
@@ -111,5 +113,11 @@ router.delete('/categories/:id',    adminAuth, category.remove);
 router.post  ('/banners',           adminAuth, upload.single('image'), banner.create);
 router.put   ('/banners/:id',       adminAuth, upload.single('image'), banner.update);
 router.delete('/banners/:id',       adminAuth, banner.remove);
+
+// Ads (admin CRUD)
+router.get   ('/ads/:id',           adminAuth, ad.get);
+router.post  ('/ads',               adminAuth, upload.single('image'), ad.create);
+router.put   ('/ads/:id',           adminAuth, upload.single('image'), ad.update);
+router.delete('/ads/:id',           adminAuth, ad.remove);
 
 module.exports = router;

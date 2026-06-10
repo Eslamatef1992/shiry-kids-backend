@@ -36,7 +36,7 @@ const Vendor = sequelize.define('Vendor', {
   id:             { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   name:           { type: DataTypes.STRING, allowNull: false },
   name_ar:        { type: DataTypes.STRING, allowNull: true },
-  email:          { type: DataTypes.STRING, allowNull: false, unique: true },
+  email:          { type: DataTypes.STRING, allowNull: true, unique: true },
   phone:          { type: DataTypes.STRING, allowNull: true },
   logo:           { type: DataTypes.STRING, allowNull: true },
   description:    { type: DataTypes.TEXT, allowNull: true },
@@ -72,8 +72,22 @@ const Product = sequelize.define('Product', {
   tags:           { type: DataTypes.JSON, defaultValue: [] },
   status:         { type: DataTypes.ENUM('active','inactive','draft'), defaultValue: 'active' },
   featured:       { type: DataTypes.BOOLEAN, defaultValue: false },
+  is_new_arrival: { type: DataTypes.BOOLEAN, defaultValue: false },
+  is_weekly_offer:{ type: DataTypes.BOOLEAN, defaultValue: false },
   rating:         { type: DataTypes.DECIMAL(3,2), defaultValue: 0 },
   reviews_count:  { type: DataTypes.INTEGER, defaultValue: 0 },
+});
+
+// ── Product Variant ───────────────────────────────────────────────────────────
+const ProductVariant = sequelize.define('ProductVariant', {
+  id:         { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  product_id: { type: DataTypes.INTEGER, references: { model: 'products', key: 'id' } },
+  size:       { type: DataTypes.STRING, allowNull: true },
+  color:      { type: DataTypes.STRING, allowNull: true },
+  sku:        { type: DataTypes.STRING, allowNull: true },
+  price:      { type: DataTypes.DECIMAL(10,3), allowNull: true },
+  stock:      { type: DataTypes.INTEGER, defaultValue: 0 },
+  image:      { type: DataTypes.STRING, allowNull: true },
 });
 
 // ── Coupon (brand coupons sold in app) ────────────────────────────────────────
@@ -166,6 +180,20 @@ const Banner = sequelize.define('Banner', {
   status:   { type: DataTypes.ENUM('active','inactive'), defaultValue: 'active' },
 });
 
+// ── Ad ────────────────────────────────────────────────────────────────────────
+const Ad = sequelize.define('Ad', {
+  id:             { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  title:          { type: DataTypes.STRING, allowNull: true },
+  title_ar:       { type: DataTypes.STRING, allowNull: true },
+  image:          { type: DataTypes.STRING, allowNull: false },
+  link_type:      { type: DataTypes.ENUM('none','product','coupon','external'), defaultValue: 'none' },
+  product_id:     { type: DataTypes.INTEGER, allowNull: true, references: { model: 'products', key: 'id' } },
+  coupon_id:      { type: DataTypes.INTEGER, allowNull: true, references: { model: 'coupons', key: 'id' } },
+  external_link:  { type: DataTypes.STRING, allowNull: true },
+  sort:           { type: DataTypes.INTEGER, defaultValue: 0 },
+  status:         { type: DataTypes.ENUM('active','inactive'), defaultValue: 'active' },
+});
+
 // ── Setting ───────────────────────────────────────────────────────────────────
 const Setting = sequelize.define('Setting', {
   id:    { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -206,6 +234,9 @@ Product.belongsTo(Vendor, { foreignKey: 'vendor_id', as: 'vendor' });
 Product.belongsTo(Category, { foreignKey: 'category_id', as: 'category' });
 Vendor.hasMany(Product, { foreignKey: 'vendor_id' });
 
+Product.hasMany(ProductVariant, { foreignKey: 'product_id', as: 'variants', onDelete: 'CASCADE' });
+ProductVariant.belongsTo(Product, { foreignKey: 'product_id' });
+
 Coupon.belongsTo(Vendor, { foreignKey: 'vendor_id', as: 'vendor' });
 Vendor.hasMany(Coupon, { foreignKey: 'vendor_id' });
 
@@ -214,10 +245,13 @@ User.hasMany(Order, { foreignKey: 'user_id' });
 
 QrScanLog.belongsTo(Admin, { foreignKey: 'admin_id', as: 'admin' });
 
+Ad.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+Ad.belongsTo(Coupon, { foreignKey: 'coupon_id', as: 'coupon' });
+
 module.exports = {
   sequelize,
   Role, Admin, User, Vendor, Category,
-  Product, Coupon, DiscountCoupon,
+  Product, ProductVariant, Coupon, DiscountCoupon,
   Order, GuestOrder, QrScanLog,
-  Setting, SeoPage, CmsPage, Banner,
+  Setting, SeoPage, CmsPage, Banner, Ad,
 };

@@ -2,6 +2,13 @@ const { Coupon, Vendor } = require('../models');
 const { paginate, paginateResponse } = require('../utils/helpers');
 const { Op } = require('sequelize');
 
+const TRUE_VALUES = ['true', '1', 1, true];
+const buildCouponData = (body) => {
+  const data = { ...body };
+  if (data.featured !== undefined) data.featured = TRUE_VALUES.includes(data.featured);
+  return data;
+};
+
 exports.list = async (req, res) => {
   try {
     const { page=1, limit=20, search, vendor_id, status, featured } = req.query;
@@ -25,7 +32,7 @@ exports.get = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const data = req.body;
+    const data = buildCouponData(req.body);
     if (req.file) data.image = `/uploads/${req.file.filename}`;
     const coupon = await Coupon.create(data);
     res.status(201).json({ success: true, data: coupon });
@@ -36,7 +43,7 @@ exports.update = async (req, res) => {
   try {
     const coupon = await Coupon.findByPk(req.params.id);
     if (!coupon) return res.status(404).json({ success: false, message: 'Not found' });
-    const data = req.body;
+    const data = buildCouponData(req.body);
     if (req.file) data.image = `/uploads/${req.file.filename}`;
     await coupon.update(data);
     res.json({ success: true, data: coupon });
