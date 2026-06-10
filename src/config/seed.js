@@ -1,6 +1,6 @@
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
-const { sequelize, Role, Admin, Setting, SeoPage } = require('../models');
+const { sequelize, Role, Admin, Setting, SeoPage, CmsPage } = require('../models');
 
 (async () => {
   try {
@@ -47,6 +47,38 @@ const { sequelize, Role, Admin, Setting, SeoPage } = require('../models');
         defaults: { title: `Shiry Kids - ${p}`, description: `Shiry Kids Fun ${p} page`, keywords: 'kids,fun,coupons' },
       });
     }
+
+    // Seed CMS pages (About Us, Privacy Policy, Terms & Conditions)
+    const cmsPages = [
+      {
+        slug: 'about-us',
+        title: 'About Us',
+        title_ar: 'من نحن',
+        content: '<p>Shiry Kids is a fun e-commerce platform dedicated to bringing the best toys, books, art kits, and more to children across Kuwait.</p><p>Edit this page from the CMS to add your own About Us content.</p>',
+        content_ar: '<p>شيري كيدز هي منصة تسوق إلكتروني ممتعة مخصصة لتوفير أفضل الألعاب والكتب وأدوات الفنون وغيرها للأطفال في جميع أنحاء الكويت.</p><p>قم بتعديل هذه الصفحة من لوحة التحكم لإضافة محتوى "من نحن" الخاص بك.</p>',
+        status: 'published',
+        sort: 1,
+      },
+      {
+        slug: 'privacy-policy',
+        title: 'Privacy Policy',
+        title_ar: 'سياسة الخصوصية',
+        content: '<p>This Privacy Policy describes how Shiry Kids collects, uses, and protects your information.</p><p>Edit this page from the CMS to add your own Privacy Policy content.</p>',
+        content_ar: '<p>توضح سياسة الخصوصية هذه كيفية جمع شيري كيدز لمعلوماتك واستخدامها وحمايتها.</p><p>قم بتعديل هذه الصفحة من لوحة التحكم لإضافة محتوى سياسة الخصوصية الخاص بك.</p>',
+        status: 'published',
+        sort: 2,
+      },
+      {
+        slug: 'terms-conditions',
+        title: 'Terms & Conditions',
+        title_ar: 'الشروط والأحكام',
+        content: '<p>By using the Shiry Kids app, you agree to the following terms and conditions.</p><p>Edit this page from the CMS to add your own Terms & Conditions content.</p>',
+        content_ar: '<p>باستخدامك لتطبيق شيري كيدز، فإنك توافق على الشروط والأحكام التالية.</p><p>قم بتعديل هذه الصفحة من لوحة التحكم لإضافة محتوى الشروط والأحكام الخاص بك.</p>',
+        status: 'published',
+        sort: 3,
+      },
+    ];
+    for (const p of cmsPages) await CmsPage.findOrCreate({ where: { slug: p.slug }, defaults: p });
 
     console.log('✅ Seed complete — admin:', process.env.SEED_ADMIN_EMAIL);
     process.exit(0);
