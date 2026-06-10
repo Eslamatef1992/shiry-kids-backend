@@ -121,7 +121,7 @@ exports.removeVendor = async (req, res) => {
 exports.stats = async (req, res) => {
   try {
     const { Order, GuestOrder, Product, Coupon } = require('../models');
-    const { Op } = require('sequelize');
+    const { Op, fn, col, literal } = require('sequelize');
     const today = new Date(); today.setHours(0,0,0,0);
     const [totalOrders, todayOrders, totalUsers, totalVendors, totalProducts, totalCoupons, revenueRow] = await Promise.all([
       Order.count(),
@@ -132,6 +132,55 @@ exports.stats = async (req, res) => {
       Coupon.count(),
       Order.sum('total', { where: { payment_status: 'paid' } }),
     ]);
-    res.json({ success: true, data: { totalOrders, todayOrders, totalUsers, totalVendors, totalProducts, totalCoupons, revenue: revenueRow || 0 } });
+
+    // Monthly orders for the last 6 months (Order + GuestOrder combined)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+    sixMonthsAgo.setDate(1);
+    sixMonthsAgo.setHours(0,0,0,0);
+
+    const [orderRows, guestOrderRows] = await Promise.all([
+      Order.findAll({
+        attributes: [[fn('DATE_FORMAT', col('created_at'), '%Y-%m'), 'month'], [fn('COUNT', col('id')), 'count']],
+        where: { created_at: { [Op.gte]: sixMonthsAgo } },
+        group: [literal('month')],
+        raw: true,
+      }),
+      GuestOrder.findAll({
+        attributes: [[fn('DATE_FORMAT', col('created_at'), '%Y-%m'), 'month'], [fn('COUNT', col('id')), 'count']],
+        where: { created_at: { [Op.gte]: sixMonthsAgo } },
+        group: [literal('month')],
+        raw: true,
+      }),
+    ]);
+
+    const monthlyMap = {};
+    [...orderRows, ...guestOrderRows].forEach(r => {
+      monthlyMap[r.month] = (monthlyMap[r.month] || 0) + parseInt(r.count, 10);
+    });
+    const monthlyOrders = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      monthlyOrders.push({ month: d.toLocaleString('en', { month: 'short' }), count: monthlyMap[key] || 0 });
+    }
+
+    // Order status breakdown (Order + GuestOrder combined)
+    const [orderStatusRows, guestStatusRows] = await Promise.all([
+      Order.findAll({ attributes: ['order_status', [fn('COUNT', col('id')), 'count']], group: ['order_status'], raw: true }),
+      GuestOrder.findAll({ attributes: ['order_status', [fn('COUNT', col('id')), 'count']], group: ['order_status'], raw: true }),
+    ]);
+    const statusMap = { processing: 0, shipped: 0, arrived: 0, cancelled: 0 };
+    [...orderStatusRows, ...guestStatusRows].forEach(r => {
+      if (statusMap[r.order_status] !== undefined) statusMap[r.order_status] += parseInt(r.count, 10);
+    });
+
+    res.json({ success: true, data: {
+      totalOrders, todayOrders, totalUsers, totalVendors, totalProducts, totalCoupons,
+      revenue: revenueRow || 0,
+      monthlyOrders,
+      orderStatusCounts: statusMap,
+    } });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
