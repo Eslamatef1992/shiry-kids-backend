@@ -159,6 +159,17 @@ const GuestOrder = sequelize.define('GuestOrder', {
   discount_code:  { type: DataTypes.STRING, allowNull: true },
 });
 
+// ── Coupon QR Code (per-unit QR images uploaded by admin) ─────────────────────
+const CouponQrCode = sequelize.define('CouponQrCode', {
+  id:          { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  coupon_id:   { type: DataTypes.INTEGER, allowNull: false, references: { model: 'coupons', key: 'id' } },
+  image:       { type: DataTypes.STRING, allowNull: false },
+  status:      { type: DataTypes.ENUM('unassigned','assigned','used'), defaultValue: 'unassigned' },
+  order_id:    { type: DataTypes.INTEGER, allowNull: true },
+  order_type:  { type: DataTypes.ENUM('order','guest_order'), allowNull: true },
+  assigned_at: { type: DataTypes.DATE, allowNull: true },
+});
+
 // ── QR Scan Log ───────────────────────────────────────────────────────────────
 const QrScanLog = sequelize.define('QrScanLog', {
   id:         { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -263,6 +274,12 @@ ProductVariant.belongsTo(Product, { foreignKey: 'product_id' });
 Coupon.belongsTo(Vendor, { foreignKey: 'vendor_id', as: 'vendor' });
 Vendor.hasMany(Coupon, { foreignKey: 'vendor_id' });
 
+Coupon.hasMany(CouponQrCode, { foreignKey: 'coupon_id', as: 'qr_codes', onDelete: 'CASCADE' });
+CouponQrCode.belongsTo(Coupon, { foreignKey: 'coupon_id', as: 'coupon' });
+
+Order.hasMany(CouponQrCode, { foreignKey: 'order_id', constraints: false, scope: { order_type: 'order' }, as: 'coupon_qr_codes' });
+GuestOrder.hasMany(CouponQrCode, { foreignKey: 'order_id', constraints: false, scope: { order_type: 'guest_order' }, as: 'coupon_qr_codes' });
+
 Order.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 User.hasMany(Order, { foreignKey: 'user_id' });
 
@@ -277,7 +294,7 @@ PushNotification.belongsTo(Admin, { foreignKey: 'admin_id', as: 'admin' });
 module.exports = {
   sequelize,
   Role, Admin, User, Vendor, Category,
-  Product, ProductVariant, Coupon, DiscountCoupon,
+  Product, ProductVariant, Coupon, DiscountCoupon, CouponQrCode,
   Order, GuestOrder, QrScanLog,
   Setting, SeoPage, CmsPage, Banner, Ad,
   DeviceToken, PushNotification,

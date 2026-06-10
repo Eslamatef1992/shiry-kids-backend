@@ -79,6 +79,11 @@ router.post  ('/coupons',           adminAuth, upload.single('image'), coupon.cr
 router.put   ('/coupons/:id',       adminAuth, upload.single('image'), coupon.update);
 router.delete('/coupons/:id',       adminAuth, coupon.remove);
 
+// Coupon QR codes (admin) — bulk-upload per-unit QR images
+router.get   ('/coupons/:id/qr-codes',       adminAuth, coupon.listQrCodes);
+router.post  ('/coupons/:id/qr-codes',       adminAuth, upload.array('qr_codes', 200), coupon.uploadQrCodes);
+router.delete('/coupons/:id/qr-codes/:qrId', adminAuth, coupon.removeQrCode);
+
 // Orders (admin)
 router.get('/admin/orders',         adminAuth, order.adminListOrders);
 router.get('/admin/orders/guest',   adminAuth, order.adminListGuestOrders);

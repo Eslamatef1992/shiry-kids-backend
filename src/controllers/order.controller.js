@@ -1,17 +1,28 @@
-const { Order, GuestOrder, User, DiscountCoupon, Product, Coupon } = require('../models');
+const { Order, GuestOrder, User, DiscountCoupon, Product, Coupon, CouponQrCode } = require('../models');
 const { paginate, paginateResponse, generateOrderNumber, generateQRCode } = require('../utils/helpers');
 const { Op } = require('sequelize');
 
 // Resolve client-supplied items ({id, type, qty}) into priced line items using
 // authoritative DB prices (Product or Coupon), and compute the subtotal.
+// Also checks per-unit QR-code stock for coupons that use the QR system
+// (i.e. have at least one CouponQrCode uploaded) and returns any stock errors.
 async function resolveOrderItems(items) {
   const resolved = [];
+  const errors = [];
   let subtotal = 0;
   for (const it of (Array.isArray(items) ? items : [])) {
     const qty = Math.max(1, parseInt(it.qty ?? it.quantity ?? 1, 10) || 1);
     if (it.type === 'coupon') {
       const c = await Coupon.findByPk(it.id);
       if (!c) continue;
+      const totalQr = await CouponQrCode.count({ where: { coupon_id: c.id } });
+      if (totalQr > 0) {
+        const availableQr = await CouponQrCode.count({ where: { coupon_id: c.id, status: 'unassigned' } });
+        if (availableQr < qty) {
+          errors.push(`Not enough QR codes available for "${c.title}" (only ${availableQr} left)`);
+          continue;
+        }
+      }
       const price = parseFloat(c.price);
       const lineTotal = price * qty;
       subtotal += lineTotal;
@@ -25,15 +36,37 @@ async function resolveOrderItems(items) {
       resolved.push({ id: p.id, type: 'product', name: p.name, image: (p.images && p.images[0]) || null, price, quantity: qty, total: lineTotal });
     }
   }
-  return { resolved, subtotal };
+  return { resolved, subtotal, errors };
+}
+
+// Assign the next available (unassigned, ordered by upload order) QR codes to
+// each coupon line item in a newly-created order. Coupons without any
+// uploaded QR codes are left untouched (backward compatible).
+async function assignCouponQrCodes(resolved, orderId, orderType) {
+  for (const item of resolved) {
+    if (item.type !== 'coupon') continue;
+    const totalQr = await CouponQrCode.count({ where: { coupon_id: item.id } });
+    if (totalQr === 0) continue;
+    const codes = await CouponQrCode.findAll({
+      where: { coupon_id: item.id, status: 'unassigned' },
+      order: [['id', 'ASC']],
+      limit: item.quantity,
+    });
+    for (const code of codes) {
+      await code.update({ status: 'assigned', order_id: orderId, order_type: orderType, assigned_at: new Date() });
+    }
+  }
 }
 
 exports.createOrder = async (req, res) => {
   try {
     const { items, payment_method, discount_code, address } = req.body;
-    const { resolved, subtotal } = await resolveOrderItems(items);
+    const { resolved, subtotal, errors } = await resolveOrderItems(items);
     if (resolved.length === 0) {
-      return res.status(400).json({ success: false, message: 'No valid items found in order' });
+      return res.status(400).json({ success: false, message: errors[0] || 'No valid items found in order' });
+    }
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, message: errors.join('; ') });
     }
     let discount = 0;
     if (discount_code) {
@@ -52,16 +85,21 @@ exports.createOrder = async (req, res) => {
       order_number, user_id: req.user.id, items: resolved, subtotal, discount,
       delivery_fees, total, payment_method, discount_code, qr_code,
     });
-    res.status(201).json({ success: true, data: { ...order.toJSON(), qr_data } });
+    await assignCouponQrCodes(resolved, order.id, 'order');
+    const coupon_qr_codes = await CouponQrCode.findAll({ where: { order_id: order.id, order_type: 'order' } });
+    res.status(201).json({ success: true, data: { ...order.toJSON(), qr_data, coupon_qr_codes } });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
 exports.createGuestOrder = async (req, res) => {
   try {
     const { name, phone, address, items, payment_method, discount_code } = req.body;
-    const { resolved, subtotal } = await resolveOrderItems(items);
+    const { resolved, subtotal, errors } = await resolveOrderItems(items);
     if (resolved.length === 0) {
-      return res.status(400).json({ success: false, message: 'No valid items found in order' });
+      return res.status(400).json({ success: false, message: errors[0] || 'No valid items found in order' });
+    }
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, message: errors.join('; ') });
     }
     let discount = 0;
     if (discount_code) {
@@ -74,12 +112,15 @@ exports.createGuestOrder = async (req, res) => {
     const delivery_fees = 1.5;
     const total = subtotal - discount + delivery_fees;
     const order_number = generateOrderNumber();
-    const qr_code = await generateQRCode(`SHIRY-ORDER-${order_number}`);
+    const qr_data = `SHIRY-ORDER-${order_number}`;
+    const qr_code = await generateQRCode(qr_data);
     const order = await GuestOrder.create({
       order_number, name: name || 'Guest', phone: phone || 'N/A', address: address || 'N/A',
       items: resolved, subtotal, discount, delivery_fees, total, payment_method, discount_code, qr_code,
     });
-    res.status(201).json({ success: true, data: order });
+    await assignCouponQrCodes(resolved, order.id, 'guest_order');
+    const coupon_qr_codes = await CouponQrCode.findAll({ where: { order_id: order.id, order_type: 'guest_order' } });
+    res.status(201).json({ success: true, data: { ...order.toJSON(), qr_data, coupon_qr_codes } });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
@@ -88,7 +129,7 @@ exports.myOrders = async (req, res) => {
     const { page=1, limit=20, payment_status } = req.query;
     const where = { user_id: req.user.id };
     if (payment_status) where.payment_status = payment_status;
-    const { count, rows } = await Order.findAndCountAll({ where, ...paginate(page, limit), order: [['created_at','DESC']] });
+    const { count, rows } = await Order.findAndCountAll({ where, include: ['coupon_qr_codes'], ...paginate(page, limit), order: [['created_at','DESC']] });
     res.json({ success: true, data: rows, meta: paginateResponse(count, page, limit) });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };

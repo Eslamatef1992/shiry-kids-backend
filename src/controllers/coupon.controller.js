@@ -1,4 +1,4 @@
-const { Coupon, Vendor } = require('../models');
+const { Coupon, Vendor, CouponQrCode } = require('../models');
 const { paginate, paginateResponse } = require('../utils/helpers');
 const { Op } = require('sequelize');
 
@@ -55,6 +55,48 @@ exports.remove = async (req, res) => {
     const coupon = await Coupon.findByPk(req.params.id);
     if (!coupon) return res.status(404).json({ success: false, message: 'Not found' });
     await coupon.destroy();
+    res.json({ success: true, message: 'Deleted' });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+// ── Coupon QR Codes (per-unit images, assigned to orders FIFO) ────────────────
+
+exports.listQrCodes = async (req, res) => {
+  try {
+    const coupon = await Coupon.findByPk(req.params.id);
+    if (!coupon) return res.status(404).json({ success: false, message: 'Not found' });
+    const items = await CouponQrCode.findAll({ where: { coupon_id: req.params.id }, order: [['id', 'ASC']] });
+    const summary = {
+      total: items.length,
+      unassigned: items.filter(i => i.status === 'unassigned').length,
+      assigned: items.filter(i => i.status === 'assigned').length,
+      used: items.filter(i => i.status === 'used').length,
+    };
+    res.json({ success: true, data: items, summary });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+exports.uploadQrCodes = async (req, res) => {
+  try {
+    const coupon = await Coupon.findByPk(req.params.id);
+    if (!coupon) return res.status(404).json({ success: false, message: 'Not found' });
+    const files = req.files || [];
+    if (files.length === 0) return res.status(400).json({ success: false, message: 'No files uploaded' });
+    const created = await Promise.all(
+      files.map(f => CouponQrCode.create({ coupon_id: coupon.id, image: `/uploads/${f.filename}` }))
+    );
+    res.status(201).json({ success: true, data: created });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+exports.removeQrCode = async (req, res) => {
+  try {
+    const item = await CouponQrCode.findOne({ where: { id: req.params.qrId, coupon_id: req.params.id } });
+    if (!item) return res.status(404).json({ success: false, message: 'Not found' });
+    if (item.status !== 'unassigned') {
+      return res.status(400).json({ success: false, message: 'Cannot delete an assigned/used QR code' });
+    }
+    await item.destroy();
     res.json({ success: true, message: 'Deleted' });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
