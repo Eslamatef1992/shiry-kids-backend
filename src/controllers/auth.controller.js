@@ -29,7 +29,8 @@ exports.register = async (req, res) => {
     const hash = await bcrypt.hash(password, 12);
     const user = await User.create({ name, email, phone, password: hash });
     const token = sign(user.id, 'user');
-    res.status(201).json({ success: true, token, user: { id: user.id, name: user.name, email: user.email } });
+    const refresh = sign(user.id, 'user', process.env.JWT_REFRESH_SECRET, process.env.JWT_REFRESH_EXPIRES_IN);
+    res.status(201).json({ success: true, token, refresh, user: { id: user.id, name: user.name, email: user.email, phone: user.phone } });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
