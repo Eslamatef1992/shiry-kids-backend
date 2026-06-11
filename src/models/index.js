@@ -164,6 +164,9 @@ const CouponQrCode = sequelize.define('CouponQrCode', {
   id:          { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   coupon_id:   { type: DataTypes.INTEGER, allowNull: false, references: { model: 'coupons', key: 'id' } },
   image:       { type: DataTypes.STRING, allowNull: false },
+  // Decoded text/data of the QR code in `image`, used to match a physical
+  // scan (by the super admin app) back to this record.
+  code:        { type: DataTypes.STRING, allowNull: true },
   status:      { type: DataTypes.ENUM('unassigned','assigned','used'), defaultValue: 'unassigned' },
   order_id:    { type: DataTypes.INTEGER, allowNull: true },
   order_type:  { type: DataTypes.ENUM('order','guest_order'), allowNull: true },

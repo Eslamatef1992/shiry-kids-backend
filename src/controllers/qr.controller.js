@@ -1,4 +1,4 @@
-const { Order, GuestOrder, QrScanLog } = require('../models');
+const { Order, GuestOrder, QrScanLog, CouponQrCode, Coupon } = require('../models');
 
 exports.scan = async (req, res) => {
   try {
@@ -20,21 +20,50 @@ exports.scan = async (req, res) => {
       }
     }
 
+    // If it's not a regular order QR, check if it matches an admin-uploaded
+    // coupon QR code (the QR the buyer/user sees after payment).
+    let couponQr = null;
+    if (!order) {
+      couponQr = await CouponQrCode.findOne({ where: { code: qr_code }, include: [{ model: Coupon, as: 'coupon' }] });
+      if (couponQr) {
+        if (couponQr.status === 'used') {
+          status = 'used';
+        } else if (couponQr.status === 'assigned') {
+          status = 'valid';
+        } else {
+          // unassigned — this QR hasn't been sold/assigned to an order yet
+          status = 'not_found';
+        }
+      }
+    }
+
     // Log the scan
     await QrScanLog.create({
       admin_id: req.admin.id,
       qr_code,
-      order_id: order?.id || null,
-      order_type,
+      order_id: order?.id || couponQr?.order_id || null,
+      order_type: order_type || couponQr?.order_type || null,
       status,
     });
 
     // Mark as used if valid
     if (status === 'valid' && order) {
       await order.update({ order_status: 'arrived' });
+    } else if (status === 'valid' && couponQr) {
+      await couponQr.update({ status: 'used' });
     }
 
-    res.json({ success: true, status, order: order ? { order_number: order.order_number, total: order.total, items: order.items } : null });
+    let orderData = null;
+    if (order) {
+      orderData = { order_number: order.order_number, total: order.total, items: order.items };
+    } else if (couponQr) {
+      orderData = {
+        coupon: couponQr.coupon ? { id: couponQr.coupon.id, title: couponQr.coupon.title, price: couponQr.coupon.price } : null,
+        qr_status: couponQr.status,
+      };
+    }
+
+    res.json({ success: true, status, order: orderData });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 

@@ -34,7 +34,10 @@ const { sequelize, Role, Admin, Setting, SeoPage, CmsPage } = require('../models
       { key: 'min_order', value: '0', group: 'shipping', label: 'Minimum Order', type: 'number' },
       { key: 'contact_email', value: 'info@shirykids.com', group: 'contact', label: 'Contact Email', type: 'text' },
       { key: 'contact_phone', value: '', group: 'contact', label: 'Contact Phone', type: 'text' },
+      { key: 'twitter', value: '', group: 'social', label: 'Twitter', type: 'text' },
       { key: 'instagram', value: '', group: 'social', label: 'Instagram', type: 'text' },
+      { key: 'linkedin', value: '', group: 'social', label: 'LinkedIn', type: 'text' },
+      { key: 'snapchat', value: '', group: 'social', label: 'Snapchat', type: 'text' },
       { key: 'whatsapp', value: '', group: 'social', label: 'WhatsApp', type: 'text' },
     ];
     for (const s of settings) await Setting.findOrCreate({ where: { key: s.key }, defaults: s });

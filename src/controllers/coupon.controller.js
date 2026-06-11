@@ -1,5 +1,5 @@
 const { Coupon, Vendor, CouponQrCode } = require('../models');
-const { paginate, paginateResponse } = require('../utils/helpers');
+const { paginate, paginateResponse, decodeQrFromImage } = require('../utils/helpers');
 const { Op } = require('sequelize');
 
 const TRUE_VALUES = ['true', '1', 1, true];
@@ -82,8 +82,30 @@ exports.uploadQrCodes = async (req, res) => {
     if (!coupon) return res.status(404).json({ success: false, message: 'Not found' });
     const files = req.files || [];
     if (files.length === 0) return res.status(400).json({ success: false, message: 'No files uploaded' });
+
+    // The number of QR codes uploaded for a coupon cannot exceed its quantity
+    // (coupon_count) — each unit sold gets exactly one unique QR code.
+    const existingCount = await CouponQrCode.count({ where: { coupon_id: coupon.id } });
+    const maxAllowed = coupon.coupon_count || 0;
+    if (existingCount + files.length > maxAllowed) {
+      const remaining = Math.max(maxAllowed - existingCount, 0);
+      return res.status(400).json({
+        success: false,
+        message: remaining > 0
+          ? `Only ${remaining} more QR code(s) can be uploaded for this coupon (quantity: ${maxAllowed}, already uploaded: ${existingCount}).`
+          : `QR code limit reached for this coupon (quantity: ${maxAllowed}).`,
+      });
+    }
+
     const created = await Promise.all(
-      files.map(f => CouponQrCode.create({ coupon_id: coupon.id, image: `/uploads/${f.filename}` }))
+      files.map(async (f) => {
+        const filePath = `/uploads/${f.filename}`;
+        // Decode the QR code embedded in the uploaded image so a customer's
+        // physical scan of the printed code can later be matched back to
+        // this record by the super admin scanner.
+        const code = await decodeQrFromImage(f.path);
+        return CouponQrCode.create({ coupon_id: coupon.id, image: filePath, code });
+      })
     );
     res.status(201).json({ success: true, data: created });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
