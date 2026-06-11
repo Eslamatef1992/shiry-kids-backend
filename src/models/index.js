@@ -135,7 +135,7 @@ const Order = sequelize.define('Order', {
   payment_method: { type: DataTypes.ENUM('knet','visa','cod'), allowNull: false },
   payment_status: { type: DataTypes.ENUM('paid','pending','failed','refunded'), defaultValue: 'pending' },
   order_status:   { type: DataTypes.ENUM('processing','shipped','arrived','cancelled'), defaultValue: 'processing' },
-  qr_code:        { type: DataTypes.STRING, allowNull: true },
+  qr_code:        { type: DataTypes.TEXT('long'), allowNull: true },
   discount_code:  { type: DataTypes.STRING, allowNull: true },
   notes:          { type: DataTypes.TEXT, allowNull: true },
 });
@@ -155,7 +155,7 @@ const GuestOrder = sequelize.define('GuestOrder', {
   payment_method: { type: DataTypes.ENUM('knet','visa','cod'), allowNull: false },
   payment_status: { type: DataTypes.ENUM('paid','pending','failed'), defaultValue: 'pending' },
   order_status:   { type: DataTypes.ENUM('processing','shipped','arrived','cancelled'), defaultValue: 'processing' },
-  qr_code:        { type: DataTypes.STRING, allowNull: true },
+  qr_code:        { type: DataTypes.TEXT('long'), allowNull: true },
   discount_code:  { type: DataTypes.STRING, allowNull: true },
 });
 

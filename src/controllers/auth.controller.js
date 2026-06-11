@@ -64,6 +64,19 @@ exports.me = async (req, res) => {
   res.json({ success: true, user: { id: req.user.id, name: req.user.name, email: req.user.email, phone: req.user.phone, address: req.user.address, avatar: req.user.avatar } });
 };
 
+// Update profile (user) — name / phone / address
+exports.updateMe = async (req, res) => {
+  try {
+    const { name, phone, address } = req.body;
+    const data = {};
+    if (name !== undefined) data.name = name;
+    if (phone !== undefined) data.phone = phone;
+    if (address !== undefined) data.address = address;
+    await req.user.update(data);
+    res.json({ success: true, user: { id: req.user.id, name: req.user.name, email: req.user.email, phone: req.user.phone, address: req.user.address, avatar: req.user.avatar } });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
 exports.adminMe = async (req, res) => {
   res.json({ success: true, admin: { id: req.admin.id, name: req.admin.name, email: req.admin.email, role: req.admin.role } });
 };

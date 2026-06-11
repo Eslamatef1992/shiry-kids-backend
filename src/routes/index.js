@@ -35,6 +35,7 @@ router.post('/notifications/register-token', optionalUserAuth, notification.regi
 
 // ── User authenticated ────────────────────────────────────────────────────────
 router.get ('/auth/me',             userAuth, auth.me);
+router.put ('/auth/me',             userAuth, auth.updateMe);
 router.post('/orders',              userAuth, order.createOrder);
 router.post('/orders/guest',        order.createGuestOrder);
 router.get ('/orders/my',           userAuth, order.myOrders);
