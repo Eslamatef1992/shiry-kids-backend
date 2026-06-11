@@ -265,6 +265,29 @@ const PushNotification = sequelize.define('PushNotification', {
   admin_id:    { type: DataTypes.INTEGER, allowNull: true, references: { model: 'admins', key: 'id' } },
 });
 
+// ── Landing Page Section (singleton sections, e.g. hero / about / footer) ─────
+const LandingSection = sequelize.define('LandingSection', {
+  id:      { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  key:     { type: DataTypes.STRING, allowNull: false, unique: true },
+  content: { type: DataTypes.JSON, allowNull: true, defaultValue: {} },
+});
+
+// ── Landing Page Item (repeatable items: how-to-use steps, partners, why-choose
+//    cards, download badges, etc.) ────────────────────────────────────────────
+const LandingItem = sequelize.define('LandingItem', {
+  id:           { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  section:      { type: DataTypes.STRING, allowNull: false }, // how_to_use | partners | why_choose | download_badges
+  image:        { type: DataTypes.STRING, allowNull: true },
+  icon:         { type: DataTypes.STRING, allowNull: true },
+  title:        { type: DataTypes.STRING, allowNull: true },
+  title_ar:     { type: DataTypes.STRING, allowNull: true },
+  description:    { type: DataTypes.TEXT, allowNull: true },
+  description_ar: { type: DataTypes.TEXT, allowNull: true },
+  link:         { type: DataTypes.STRING, allowNull: true },
+  sort:         { type: DataTypes.INTEGER, defaultValue: 0 },
+  status:       { type: DataTypes.ENUM('active','inactive'), defaultValue: 'active' },
+});
+
 // ── Associations ──────────────────────────────────────────────────────────────
 Admin.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
 Role.hasMany(Admin, { foreignKey: 'role_id' });
@@ -303,4 +326,5 @@ module.exports = {
   Order, GuestOrder, QrScanLog,
   Setting, SeoPage, CmsPage, Banner, Ad,
   DeviceToken, PushNotification,
+  LandingSection, LandingItem,
 };

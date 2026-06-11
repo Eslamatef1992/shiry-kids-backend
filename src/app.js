@@ -11,8 +11,12 @@ app.use(cors({
   origin: [
     process.env.ADMIN_URL,
     process.env.CLIENT_URL,
+    process.env.LANDING_URL,
+    'https://shirykids.com',
+    'https://www.shirykids.com',
     'http://localhost:3001',
     'http://localhost:5173',
+    'http://localhost:5174',
   ],
   credentials: true,
 }));

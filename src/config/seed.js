@@ -1,6 +1,6 @@
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
-const { sequelize, Role, Admin, Setting, SeoPage, CmsPage } = require('../models');
+const { sequelize, Role, Admin, Setting, SeoPage, CmsPage, LandingSection, LandingItem } = require('../models');
 
 (async () => {
   try {
@@ -82,6 +82,87 @@ const { sequelize, Role, Admin, Setting, SeoPage, CmsPage } = require('../models
       },
     ];
     for (const p of cmsPages) await CmsPage.findOrCreate({ where: { slug: p.slug }, defaults: p });
+
+    // Seed landing page sections (shirykids.com)
+    const landingSections = [
+      {
+        key: 'hero',
+        content: {
+          title: 'SHIRY KIDS FUN',
+          title_ar: 'شيري كيدز فن',
+          subtitle: 'Discover exclusive coupons, fun activities and unforgettable family experiences — all in one app.',
+          subtitle_ar: 'اكتشف كوبونات حصرية وأنشطة ممتعة وتجارب عائلية لا تُنسى — كل ذلك في تطبيق واحد.',
+          background_image: '',
+          cta_primary_text: 'Download App',
+          cta_primary_text_ar: 'حمل التطبيق',
+          cta_primary_link: '#download',
+          cta_secondary_text: 'Learn More',
+          cta_secondary_text_ar: 'اعرف المزيد',
+          cta_secondary_link: '#about',
+        },
+      },
+      {
+        key: 'about',
+        content: {
+          title: 'Shiry Kids Fun',
+          title_ar: 'شيري كيدز فن',
+          text: 'Shiry Kids Fun brings families closer together with exclusive digital coupons, fun activities and special offers from our trusted partners — all accessible from a single, easy-to-use mobile app.',
+          text_ar: 'يجمع تطبيق شيري كيدز فن العائلات معًا من خلال كوبونات رقمية حصرية وأنشطة ممتعة وعروض خاصة من شركائنا الموثوقين — كل ذلك من خلال تطبيق واحد سهل الاستخدام.',
+          image: '',
+        },
+      },
+      {
+        key: 'about2',
+        content: {
+          title: 'About Shiry Kids Fun',
+          title_ar: 'عن شيري كيدز فن',
+          text: 'Our mission is to make family fun more accessible and affordable. Browse a growing collection of partner venues and activities, redeem coupons instantly, and create memories that last.',
+          text_ar: 'مهمتنا هي جعل المرح العائلي أكثر سهولة واقتصادية. تصفح مجموعة متنامية من الأماكن والأنشطة الشريكة، واستبدل الكوبونات فورًا، واصنع ذكريات تدوم.',
+        },
+      },
+      {
+        key: 'download_app',
+        content: {
+          title: 'Download Shiry Kids Fun Application',
+          title_ar: 'حمل تطبيق شيري كيدز فن',
+          subtitle: 'Available now on the App Store and Google Play. Download Shiry Kids Fun and start enjoying exclusive deals today.',
+          subtitle_ar: 'متوفر الآن على App Store وGoogle Play. حمل تطبيق شيري كيدز فن وابدأ بالاستمتاع بالعروض الحصرية اليوم.',
+          mockup_image: '',
+          app_store_image: '',
+          app_store_link: '',
+          google_play_image: '',
+          google_play_link: '',
+        },
+      },
+      {
+        key: 'footer',
+        content: {
+          copyright: `© ${new Date().getFullYear()} SHIRY KIDS FUN. ALL RIGHTS RESERVED.`,
+          copyright_ar: `© ${new Date().getFullYear()} شيري كيدز فن. جميع الحقوق محفوظة.`,
+          facebook_link: '',
+          instagram_link: '',
+          twitter_link: '',
+          tiktok_link: '',
+          youtube_link: '',
+        },
+      },
+    ];
+    for (const s of landingSections) await LandingSection.findOrCreate({ where: { key: s.key }, defaults: s });
+
+    // Seed landing page items (how-to-use steps & why-choose-us cards)
+    const landingItems = [
+      { section: 'how_to_use', title: 'Sign Up', title_ar: 'إنشاء حساب', description: 'Create your free account in seconds.', description_ar: 'أنشئ حسابك المجاني في ثوانٍ.', sort: 1 },
+      { section: 'how_to_use', title: 'Find Products & Coupons', title_ar: 'ابحث عن المنتجات والكوبونات', description: 'Browse exclusive deals from our partners.', description_ar: 'تصفح عروض حصرية من شركائنا.', sort: 2 },
+      { section: 'how_to_use', title: 'Enjoy', title_ar: 'استمتع', description: 'Redeem your coupon and enjoy the experience.', description_ar: 'استبدل الكوبون واستمتع بالتجربة.', sort: 3 },
+      { section: 'why_choose', title: 'User-Friendly Mobile App', title_ar: 'تطبيق سهل الاستخدام', description: 'A simple, intuitive app designed for the whole family.', description_ar: 'تطبيق بسيط وسهل مصمم لجميع أفراد العائلة.', sort: 1 },
+      { section: 'why_choose', title: 'Instant Access To Digital Coupons', title_ar: 'وصول فوري للكوبونات الرقمية', description: 'Unlock and redeem coupons instantly from your phone.', description_ar: 'افتح واستبدل الكوبونات فورًا من هاتفك.', sort: 2 },
+      { section: 'why_choose', title: 'Trusted Platform For Families', title_ar: 'منصة موثوقة للعائلات', description: 'Safe, reliable and trusted by families across Kuwait.', description_ar: 'آمنة وموثوقة من قبل العائلات في جميع أنحاء الكويت.', sort: 3 },
+      { section: 'why_choose', title: 'Fast & Easy Ordering', title_ar: 'طلب سريع وسهل', description: 'Order products and redeem offers in just a few taps.', description_ar: 'اطلب المنتجات واستبدل العروض بضع نقرات فقط.', sort: 4 },
+      { section: 'why_choose', title: 'Exclusive Offers & Deals', title_ar: 'عروض وصفقات حصرية', description: 'Get access to deals you won\'t find anywhere else.', description_ar: 'احصل على عروض لن تجدها في أي مكان آخر.', sort: 5 },
+    ];
+    for (const i of landingItems) {
+      await LandingItem.findOrCreate({ where: { section: i.section, title: i.title }, defaults: i });
+    }
 
     console.log('✅ Seed complete — admin:', process.env.SEED_ADMIN_EMAIL);
     process.exit(0);

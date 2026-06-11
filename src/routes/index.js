@@ -16,6 +16,7 @@ const category = require('../controllers/category.controller');
 const banner   = require('../controllers/banner.controller');
 const ad       = require('../controllers/ad.controller');
 const notification = require('../controllers/notification.controller');
+const landing  = require('../controllers/landing.controller');
 
 // ── Public ────────────────────────────────────────────────────────────────────
 router.post('/auth/admin/login',    auth.adminLogin);
@@ -29,6 +30,7 @@ router.get ('/categories',          category.list);
 router.get ('/categories/:id',      category.get);
 router.get ('/banners',             banner.list);
 router.get ('/ads',                 ad.list);
+router.get ('/landing',             landing.getAll);
 
 // Push notification device token registration (works for guests too)
 router.post('/notifications/register-token', optionalUserAuth, notification.registerToken);
@@ -133,5 +135,14 @@ router.delete('/ads/:id',           adminAuth, ad.remove);
 // Push notifications (admin)
 router.get ('/notifications',       adminAuth, notification.list);
 router.post('/notifications/send',  adminAuth, upload.single('image'), notification.send);
+
+// Landing page (admin)
+router.get   ('/landing/sections',       adminAuth, landing.listSections);
+router.put   ('/landing/sections/:key',  adminAuth, landing.upsertSection);
+router.get   ('/landing/items',          adminAuth, landing.listItems);
+router.post  ('/landing/items',          adminAuth, upload.single('image'), landing.createItem);
+router.put   ('/landing/items/:id',      adminAuth, upload.single('image'), landing.updateItem);
+router.delete('/landing/items/:id',      adminAuth, landing.removeItem);
+router.post  ('/landing/upload',         adminAuth, upload.single('file'), landing.uploadImage);
 
 module.exports = router;

@@ -7,8 +7,10 @@ set -e
 
 BACKEND_DIR="/var/www/shiry-kids-backend"
 ADMIN_DIR="/var/www/shiry-kids-admin"
+LANDING_DIR="/var/www/shiry-kids-landing"
 BACKEND_REPO="https://github.com/eslamatef1992/shiry-kids-backend.git"
 ADMIN_REPO="https://github.com/eslamatef1992/shiry-kids-admin.git"
+LANDING_REPO="https://github.com/eslamatef1992/shiry-kids-landing.git"
 
 echo "==> Installing system dependencies..."
 apt-get update -y
@@ -63,13 +65,28 @@ cd "$ADMIN_DIR"
 npm install
 npm run build   # output → dist/
 
+# ── Landing site (shirykids.com) ────────────────────────────────────────────────
+echo "==> Deploying landing site..."
+if [ -d "$LANDING_DIR" ]; then
+  git -C "$LANDING_DIR" pull
+else
+  git clone "$LANDING_REPO" "$LANDING_DIR"
+fi
+
+cd "$LANDING_DIR"
+[ -f .env ] || cp .env.example .env
+npm install
+npm run build   # output → dist/
+
 # ── nginx ─────────────────────────────────────────────────────────────────────
 echo "==> Configuring nginx..."
 cp "$BACKEND_DIR/nginx/back.shirykids.com.conf"  /etc/nginx/sites-available/back.shirykids.com
 cp "$BACKEND_DIR/nginx/admin.shirykids.com.conf" /etc/nginx/sites-available/admin.shirykids.com
+cp "$BACKEND_DIR/nginx/shirykids.com.conf"       /etc/nginx/sites-available/shirykids.com
 
 ln -sf /etc/nginx/sites-available/back.shirykids.com  /etc/nginx/sites-enabled/
 ln -sf /etc/nginx/sites-available/admin.shirykids.com /etc/nginx/sites-enabled/
+ln -sf /etc/nginx/sites-available/shirykids.com       /etc/nginx/sites-enabled/
 
 # Remove default site if present
 rm -f /etc/nginx/sites-enabled/default
@@ -80,6 +97,7 @@ nginx -t && systemctl reload nginx
 echo "==> Obtaining SSL certificates..."
 certbot --nginx -d back.shirykids.com  --non-interactive --agree-tos -m eslam@teknulugy.com
 certbot --nginx -d admin.shirykids.com --non-interactive --agree-tos -m eslam@teknulugy.com
+certbot --nginx -d shirykids.com -d www.shirykids.com --non-interactive --agree-tos -m eslam@teknulugy.com
 
 systemctl reload nginx
 
@@ -88,4 +106,5 @@ echo "======================================================"
 echo "  Deployment complete!"
 echo "  Backend:    https://back.shirykids.com/health"
 echo "  Admin panel: https://admin.shirykids.com"
+echo "  Landing site: https://shirykids.com"
 echo "======================================================"
