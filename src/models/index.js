@@ -98,6 +98,8 @@ const Coupon = sequelize.define('Coupon', {
   title_ar:        { type: DataTypes.STRING, allowNull: true },
   description:     { type: DataTypes.TEXT, allowNull: true },
   description_ar:  { type: DataTypes.TEXT, allowNull: true },
+  terms_and_conditions:    { type: DataTypes.TEXT, allowNull: true },
+  terms_and_conditions_ar: { type: DataTypes.TEXT, allowNull: true },
   image:           { type: DataTypes.STRING, allowNull: true },
   price:           { type: DataTypes.DECIMAL(10,3), allowNull: false },
   original_price:  { type: DataTypes.DECIMAL(10,3), allowNull: true },
