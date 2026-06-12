@@ -62,15 +62,19 @@ exports.send = async (req, res) => {
 
       // Remove tokens that are no longer valid (app uninstalled, etc.)
       const invalidIds = [];
+      const errors = [];
       response.responses.forEach((r, idx) => {
         if (!r.success) {
           const code = r.error?.code || '';
+          errors.push({ code, message: r.error?.message || '' });
           if (code.includes('registration-token-not-registered') || code.includes('invalid-argument')) {
             invalidIds.push(tokens[idx].id);
           }
         }
       });
       if (invalidIds.length) await DeviceToken.destroy({ where: { id: invalidIds } });
+      if (errors.length) console.error('FCM send errors:', JSON.stringify(errors));
+      req._fcmErrors = errors;
     }
 
     const notif = await PushNotification.create({
@@ -87,6 +91,8 @@ exports.send = async (req, res) => {
       message: fbAdmin
         ? `Sent to ${sentCount} of ${tokenList.length} device(s)`
         : 'Saved, but Firebase is not configured yet — no push was sent.',
+      // Temporary diagnostics for Task #95 — remove once push delivery is confirmed working.
+      fcm_errors: req._fcmErrors || [],
     });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
