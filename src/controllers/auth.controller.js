@@ -77,6 +77,15 @@ exports.updateMe = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
+// Update profile photo (user)
+exports.updateAvatar = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No image uploaded' });
+    await req.user.update({ avatar: `/uploads/${req.file.filename}` });
+    res.json({ success: true, user: { id: req.user.id, name: req.user.name, email: req.user.email, phone: req.user.phone, address: req.user.address, avatar: req.user.avatar } });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
 exports.adminMe = async (req, res) => {
   res.json({ success: true, admin: { id: req.admin.id, name: req.admin.name, email: req.admin.email, role: req.admin.role } });
 };
