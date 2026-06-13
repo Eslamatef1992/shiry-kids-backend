@@ -9,6 +9,19 @@ const buildCouponData = (body) => {
   return data;
 };
 
+// Attach `qr_total` / `qr_available` to a coupon's JSON so clients can tell
+// whether the coupon is sold out (only meaningful for coupons that use the
+// per-unit QR system — coupons with no uploaded QR codes are treated as
+// unlimited, matching resolveOrderItems's stock-check logic).
+const withQrStock = async (coupon) => {
+  const json = coupon.toJSON();
+  const qr_total = await CouponQrCode.count({ where: { coupon_id: coupon.id } });
+  const qr_available = qr_total > 0
+    ? await CouponQrCode.count({ where: { coupon_id: coupon.id, status: 'unassigned' } })
+    : 0;
+  return { ...json, qr_total, qr_available };
+};
+
 exports.list = async (req, res) => {
   try {
     const { page=1, limit=20, search, vendor_id, status, featured } = req.query;
@@ -18,7 +31,8 @@ exports.list = async (req, res) => {
     if (status) where.status = status;
     if (featured !== undefined) where.featured = featured === 'true';
     const { count, rows } = await Coupon.findAndCountAll({ where, include: ['vendor'], ...paginate(page, limit), order: [['created_at','DESC']] });
-    res.json({ success: true, data: rows, meta: paginateResponse(count, page, limit) });
+    const data = await Promise.all(rows.map(withQrStock));
+    res.json({ success: true, data, meta: paginateResponse(count, page, limit) });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
@@ -26,7 +40,7 @@ exports.get = async (req, res) => {
   try {
     const c = await Coupon.findByPk(req.params.id, { include: ['vendor'] });
     if (!c) return res.status(404).json({ success: false, message: 'Not found' });
-    res.json({ success: true, data: c });
+    res.json({ success: true, data: await withQrStock(c) });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 

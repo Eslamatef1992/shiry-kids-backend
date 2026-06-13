@@ -70,7 +70,14 @@ exports.list = async (req, res) => {
   try {
     const { page=1, limit=20, search, category_id, vendor_id, status, featured, is_new_arrival, is_weekly_offer } = req.query;
     const where = {};
-    if (search) where.name = { [Op.like]: `%${search}%` };
+    if (search) {
+      where[Op.or] = [
+        { name: { [Op.like]: `%${search}%` } },
+        { name_ar: { [Op.like]: `%${search}%` } },
+        { description: { [Op.like]: `%${search}%` } },
+        { description_ar: { [Op.like]: `%${search}%` } },
+      ];
+    }
     if (category_id) where.category_id = category_id;
     if (vendor_id) where.vendor_id = vendor_id;
     if (status) where.status = status;
