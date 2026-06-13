@@ -8,6 +8,21 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR
 
 const APP_NAME = 'Shiry Kids';
 
+// Logo bundled with the backend, embedded as an inline (cid:) attachment so
+// it shows up reliably across email clients without hotlinking an image.
+const LOGO_PATH = path.join(__dirname, '../assets/email/logo.png');
+const LOGO_CID = 'shiry-kids-logo.png';
+
+const getLogoAttachment = () => {
+  try {
+    if (!fs.existsSync(LOGO_PATH)) return null;
+    return { filename: LOGO_CID, data: fs.readFileSync(LOGO_PATH) };
+  } catch (e) {
+    console.error('getLogoAttachment error:', e.message);
+    return null;
+  }
+};
+
 const FROM = () => {
   const email = process.env.MAILGUN_FROM_EMAIL || `no-reply@${process.env.MAILGUN_DOMAIN || 'shirykids.com'}`;
   const name = process.env.MAILGUN_FROM_NAME || APP_NAME;
@@ -18,8 +33,8 @@ const FROM = () => {
 const layout = (title, bodyHtml) => `
   <div style="font-family:Arial,Helvetica,sans-serif;background:#f7f7f7;padding:24px 0;">
     <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #eee;">
-      <div style="background:#FF383C;padding:20px 24px;">
-        <h1 style="color:#fff;margin:0;font-size:20px;">${APP_NAME}</h1>
+      <div style="background:#FF383C;padding:20px 24px;text-align:center;">
+        <img src="cid:${LOGO_CID}" alt="${APP_NAME}" style="height:48px;width:auto;display:inline-block;vertical-align:middle;" />
       </div>
       <div style="padding:24px;color:#333;">
         <h2 style="margin-top:0;font-size:18px;">${title}</h2>
@@ -87,7 +102,8 @@ async function sendPasswordResetEmail(user, code) {
     </div>
     <p>This code will expire in 15 minutes. If you didn't request this, you can safely ignore this email.</p>
   `);
-  return sendEmail({ to: user.email, subject: `${APP_NAME} - Password Reset Code`, html });
+  const inline = [getLogoAttachment()].filter(Boolean);
+  return sendEmail({ to: user.email, subject: `${APP_NAME} - Password Reset Code`, html, inline });
 }
 
 // ── Order confirmation (incl. coupon QR codes if any) ──────────────────────────
@@ -101,7 +117,7 @@ async function sendOrderConfirmationEmail(user, order, couponQrCodes = []) {
     </tr>
   `).join('');
 
-  const inline = [];
+  const inline = [getLogoAttachment()].filter(Boolean);
   let qrHtml = '';
   if (order.qr_code) {
     const orderQr = dataUrlToAttachment(order.qr_code, 'order-qr-code.png');
