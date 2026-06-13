@@ -77,7 +77,9 @@ exports.createOrder = async (req, res) => {
         await dc.increment('used_count');
       }
     }
-    const delivery_fees = 1.5;
+    // Delivery only applies when the order contains a physical product —
+    // coupon-only orders have nothing to ship, so no delivery fee.
+    const delivery_fees = resolved.some(i => i.type === 'product') ? 1.5 : 0;
     const total = subtotal - discount + delivery_fees;
     const order_number = generateOrderNumber();
     const qr_data = `SHIRY-ORDER-${order_number}`;
@@ -120,7 +122,9 @@ exports.createGuestOrder = async (req, res) => {
         await dc.increment('used_count');
       }
     }
-    const delivery_fees = 1.5;
+    // Delivery only applies when the order contains a physical product —
+    // coupon-only orders have nothing to ship, so no delivery fee.
+    const delivery_fees = resolved.some(i => i.type === 'product') ? 1.5 : 0;
     const total = subtotal - discount + delivery_fees;
     const order_number = generateOrderNumber();
     const qr_data = `SHIRY-ORDER-${order_number}`;
