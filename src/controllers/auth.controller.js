@@ -44,6 +44,8 @@ exports.login = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     if (user.status === 'banned')
       return res.status(403).json({ success: false, message: 'Account banned' });
+    if (user.status === 'terminated')
+      return res.status(403).json({ success: false, message: 'This account has been terminated' });
     const token = sign(user.id, 'user');
     const refresh = sign(user.id, 'user', process.env.JWT_REFRESH_SECRET, process.env.JWT_REFRESH_EXPIRES_IN);
     res.json({ success: true, token, refresh, user: { id: user.id, name: user.name, email: user.email, phone: user.phone } });
@@ -75,6 +77,16 @@ exports.updateMe = async (req, res) => {
     if (address !== undefined) data.address = address;
     await req.user.update(data);
     res.json({ success: true, user: { id: req.user.id, name: req.user.name, email: req.user.email, phone: req.user.phone, address: req.user.address, avatar: req.user.avatar } });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+// Terminate (deactivate) the logged-in user's account. We don't hard-delete
+// to preserve order history/integrity — instead mark the account as
+// 'terminated', which blocks future logins (see login above).
+exports.terminateAccount = async (req, res) => {
+  try {
+    await req.user.update({ status: 'terminated' });
+    res.json({ success: true, message: 'Account terminated' });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
