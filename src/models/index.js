@@ -29,7 +29,7 @@ const User = sequelize.define('User', {
   address:  { type: DataTypes.TEXT, allowNull: true },
   avatar:   { type: DataTypes.STRING, allowNull: true },
   status:   { type: DataTypes.ENUM('active','inactive','banned'), defaultValue: 'active' },
-  password_reset_code:    { type: DataTypes.STRING(10), allowNull: true },
+  password_reset_code:    { type: DataTypes.STRING(100), allowNull: true },
   password_reset_expires: { type: DataTypes.DATE, allowNull: true },
 });
 
