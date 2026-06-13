@@ -159,7 +159,6 @@ async function sendOrderConfirmationEmail(user, order, couponQrCodes = []) {
       <tr><td>Delivery</td><td style="text-align:right;">${parseFloat(order.delivery_fees).toFixed(3)}</td></tr>
       <tr><td style="font-weight:700;padding-top:6px;">Total</td><td style="text-align:right;font-weight:700;padding-top:6px;">${parseFloat(order.total).toFixed(3)}</td></tr>
     </table>
-    ${qrHtml}
     ${couponHtml}
     <p style="margin-top:24px;">We'll notify you when your order is on its way.</p>
   `);
