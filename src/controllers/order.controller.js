@@ -1,5 +1,6 @@
 const { Order, GuestOrder, User, DiscountCoupon, Product, Coupon, CouponQrCode } = require('../models');
 const { paginate, paginateResponse, generateOrderNumber, generateQRCode } = require('../utils/helpers');
+const { sendOrderConfirmationEmail } = require('../utils/email');
 const { Op } = require('sequelize');
 
 // Resolve client-supplied items ({id, type, qty}) into priced line items using
@@ -88,6 +89,10 @@ exports.createOrder = async (req, res) => {
     await assignCouponQrCodes(resolved, order.id, 'order');
     const coupon_qr_codes = await CouponQrCode.findAll({ where: { order_id: order.id, order_type: 'order' } });
     res.status(201).json({ success: true, data: { ...order.toJSON(), qr_data, coupon_qr_codes } });
+
+    // Fire-and-forget order confirmation email (with QR code(s) attached).
+    // sendOrderConfirmationEmail never throws — failures are logged only.
+    sendOrderConfirmationEmail(req.user, order, coupon_qr_codes);
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 

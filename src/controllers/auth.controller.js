@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Admin, User } = require('../models');
+const { sendPasswordResetEmail } = require('../utils/email');
 
 const sign = (id, type, secret = process.env.JWT_SECRET, exp = process.env.JWT_EXPIRES_IN) =>
   jwt.sign({ id, type }, secret, { expiresIn: exp });
@@ -88,4 +89,69 @@ exports.updateAvatar = async (req, res) => {
 
 exports.adminMe = async (req, res) => {
   res.json({ success: true, admin: { id: req.admin.id, name: req.admin.name, email: req.admin.email, role: req.admin.role } });
+};
+
+// ── Forgot / reset password ───────────────────────────────────────────────────
+const RESET_CODE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+// Request a password-reset code. Always responds with success (even if the
+// email isn't registered) so we don't leak which emails have accounts.
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
+
+    const user = await User.findOne({ where: { email } });
+    if (user) {
+      const code = String(Math.floor(1000 + Math.random() * 9000)); // 4-digit code
+      const hash = await bcrypt.hash(code, 10);
+      await user.update({
+        password_reset_code: hash,
+        password_reset_expires: new Date(Date.now() + RESET_CODE_TTL_MS),
+      });
+      await sendPasswordResetEmail(user, code);
+    }
+    res.json({ success: true, message: 'If this email is registered, a verification code has been sent.' });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+// Verify a reset code without consuming it (used by the OTP screen to give
+// immediate feedback before the user sets a new password).
+exports.verifyResetCode = async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) return res.status(400).json({ success: false, message: 'Email and code are required' });
+
+    const user = await User.findOne({ where: { email } });
+    const valid = !!user
+      && user.password_reset_code
+      && user.password_reset_expires
+      && new Date(user.password_reset_expires) > new Date()
+      && await bcrypt.compare(String(code), user.password_reset_code);
+
+    if (!valid) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
+    res.json({ success: true, message: 'Code verified' });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+// Verify the reset code and set a new password.
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, code, password } = req.body;
+    if (!email || !code || !password) return res.status(400).json({ success: false, message: 'Email, code and password are required' });
+    if (password.length < 6) return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+
+    const user = await User.findOne({ where: { email } });
+    const valid = !!user
+      && user.password_reset_code
+      && user.password_reset_expires
+      && new Date(user.password_reset_expires) > new Date()
+      && await bcrypt.compare(String(code), user.password_reset_code);
+
+    if (!valid) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
+
+    const hash = await bcrypt.hash(password, 12);
+    await user.update({ password: hash, password_reset_code: null, password_reset_expires: null });
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
