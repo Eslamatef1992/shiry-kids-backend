@@ -90,9 +90,15 @@ exports.createOrder = async (req, res) => {
     const coupon_qr_codes = await CouponQrCode.findAll({ where: { order_id: order.id, order_type: 'order' } });
     res.status(201).json({ success: true, data: { ...order.toJSON(), qr_data, coupon_qr_codes } });
 
-    // Fire-and-forget order confirmation email (with QR code(s) attached).
+    // For Cash on Delivery there's no online payment step, so the order is
+    // confirmed immediately — send the confirmation email now.
+    // For online methods (knet/visa) the email is sent later, once Tap
+    // confirms the payment (see payment.controller.js applyChargeResult),
+    // so we don't email customers about orders they never actually paid for.
     // sendOrderConfirmationEmail never throws — failures are logged only.
-    sendOrderConfirmationEmail(req.user, order, coupon_qr_codes);
+    if (payment_method === 'cod') {
+      sendOrderConfirmationEmail(req.user, order, coupon_qr_codes);
+    }
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 

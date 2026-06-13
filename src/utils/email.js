@@ -118,18 +118,10 @@ async function sendOrderConfirmationEmail(user, order, couponQrCodes = []) {
   `).join('');
 
   const inline = [getLogoAttachment()].filter(Boolean);
-  let qrHtml = '';
-  if (order.qr_code) {
-    const orderQr = dataUrlToAttachment(order.qr_code, 'order-qr-code.png');
-    if (orderQr) {
-      inline.push(orderQr);
-      qrHtml += `
-        <p style="margin-top:24px;">Your order QR code (attached) can be shown at checkout/pickup:</p>
-        <div style="text-align:center;"><img src="cid:order-qr-code.png" alt="Order QR Code" style="width:160px;height:160px;" /></div>
-      `;
-    }
-  }
 
+  // Note: we intentionally do NOT attach the generic order.qr_code here —
+  // QR codes are only relevant for Coupon items, and those are sent below
+  // as the per-unit assigned coupon QR codes.
   let couponHtml = '';
   const validCoupons = (couponQrCodes || []).map((c, i) => {
     const filename = `coupon-qr-${i + 1}.png`;
