@@ -70,21 +70,46 @@ exports.list = async (req, res) => {
   try {
     const { page=1, limit=20, search, category_id, vendor_id, status, featured, is_new_arrival, is_weekly_offer } = req.query;
     const where = {};
-    if (search) {
-      where[Op.or] = [
-        { name: { [Op.like]: `%${search}%` } },
-        { name_ar: { [Op.like]: `%${search}%` } },
-        { description: { [Op.like]: `%${search}%` } },
-        { description_ar: { [Op.like]: `%${search}%` } },
-      ];
-    }
     if (category_id) where.category_id = category_id;
     if (vendor_id) where.vendor_id = vendor_id;
     if (status) where.status = status;
     if (featured !== undefined) where.featured = featured === 'true';
     if (is_new_arrival !== undefined) where.is_new_arrival = is_new_arrival === 'true';
     if (is_weekly_offer !== undefined) where.is_weekly_offer = is_weekly_offer === 'true';
-    const { count, rows } = await Product.findAndCountAll({ where, include: ['vendor','category','variants'], ...paginate(page, limit), order: [['created_at','DESC']] });
+
+    if (search) {
+      // Search matches the product's own name/description fields, plus its
+      // vendor's name and its category's name (AR/EN). Resolve matching IDs
+      // first via a join query (no `variants` hasMany involved here), then
+      // fetch the full paginated result set by ID — this avoids the
+      // subQuery/hasMany pitfalls of filtering on association columns while
+      // also including a hasMany (variants).
+      const term = `%${search}%`;
+      const matches = await Product.findAll({
+        attributes: ['id'],
+        where: {
+          ...where,
+          [Op.or]: [
+            { name: { [Op.like]: term } },
+            { name_ar: { [Op.like]: term } },
+            { description: { [Op.like]: term } },
+            { description_ar: { [Op.like]: term } },
+            { '$vendor.name$': { [Op.like]: term } },
+            { '$vendor.name_ar$': { [Op.like]: term } },
+            { '$category.name$': { [Op.like]: term } },
+            { '$category.name_ar$': { [Op.like]: term } },
+          ],
+        },
+        include: [{ association: 'vendor', attributes: [] }, { association: 'category', attributes: [] }],
+        subQuery: false,
+      });
+      where.id = { [Op.in]: matches.map(m => m.id) };
+    }
+
+    const { count, rows } = await Product.findAndCountAll({
+      where, include: ['vendor','category','variants'], ...paginate(page, limit), order: [['created_at','DESC']],
+      distinct: true,
+    });
     res.json({ success: true, data: rows, meta: paginateResponse(count, page, limit) });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };

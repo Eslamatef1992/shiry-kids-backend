@@ -110,6 +110,10 @@ const Coupon = sequelize.define('Coupon', {
   expiry_date:     { type: DataTypes.DATE, allowNull: true },
   status:          { type: DataTypes.ENUM('active','inactive','expired'), defaultValue: 'active' },
   featured:        { type: DataTypes.BOOLEAN, defaultValue: false },
+  // Occasion/category tag used to power the category chips on the Coupons
+  // screen (e.g. 'birthday', 'mothers_day'). Free-form string so new
+  // categories can be added from the admin without a migration.
+  category:        { type: DataTypes.STRING, allowNull: true },
 });
 
 // ── Discount Coupon (promo codes for checkout) ────────────────────────────────

@@ -24,13 +24,27 @@ const withQrStock = async (coupon) => {
 
 exports.list = async (req, res) => {
   try {
-    const { page=1, limit=20, search, vendor_id, status, featured } = req.query;
+    const { page=1, limit=20, search, vendor_id, status, featured, category } = req.query;
     const where = {};
-    if (search) where.title = { [Op.like]: `%${search}%` };
+    if (search) {
+      where[Op.or] = [
+        { title: { [Op.like]: `%${search}%` } },
+        { title_ar: { [Op.like]: `%${search}%` } },
+        { description: { [Op.like]: `%${search}%` } },
+        { description_ar: { [Op.like]: `%${search}%` } },
+        { category: { [Op.like]: `%${search}%` } },
+        { '$vendor.name$': { [Op.like]: `%${search}%` } },
+        { '$vendor.name_ar$': { [Op.like]: `%${search}%` } },
+      ];
+    }
     if (vendor_id) where.vendor_id = vendor_id;
     if (status) where.status = status;
     if (featured !== undefined) where.featured = featured === 'true';
-    const { count, rows } = await Coupon.findAndCountAll({ where, include: ['vendor'], ...paginate(page, limit), order: [['created_at','DESC']] });
+    if (category) where.category = category;
+    const { count, rows } = await Coupon.findAndCountAll({
+      where, include: ['vendor'], ...paginate(page, limit), order: [['created_at','DESC']],
+      distinct: true, subQuery: false,
+    });
     const data = await Promise.all(rows.map(withQrStock));
     res.json({ success: true, data, meta: paginateResponse(count, page, limit) });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
