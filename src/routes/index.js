@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { adminAuth, userAuth, optionalUserAuth } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const uploadExcel = require('../middleware/uploadExcel');
 
 const auth     = require('../controllers/auth.controller');
 const admin    = require('../controllers/admin.controller');
@@ -18,6 +19,7 @@ const ad       = require('../controllers/ad.controller');
 const notification = require('../controllers/notification.controller');
 const landing  = require('../controllers/landing.controller');
 const payment  = require('../controllers/payment.controller');
+const qrGenerator = require('../controllers/qrGenerator.controller');
 
 // ── Public ────────────────────────────────────────────────────────────────────
 router.post('/auth/admin/login',    auth.adminLogin);
@@ -108,6 +110,9 @@ router.patch('/admin/orders/:id',   adminAuth, order.updateOrderStatus);
 // QR
 router.post('/qr/scan',             adminAuth, qr.scan);
 router.get ('/qr/history',          adminAuth, qr.history);
+
+// QR Code Generator (bulk-generate QR images from an uploaded Excel/CSV)
+router.post('/qr-codes/generate',   adminAuth, uploadExcel.single('file'), qrGenerator.generate);
 
 // Discount coupons (admin CRUD)
 router.get   ('/discount-coupons',  adminAuth, dc.list);
