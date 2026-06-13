@@ -17,6 +17,7 @@ const banner   = require('../controllers/banner.controller');
 const ad       = require('../controllers/ad.controller');
 const notification = require('../controllers/notification.controller');
 const landing  = require('../controllers/landing.controller');
+const payment  = require('../controllers/payment.controller');
 
 // ── Public ────────────────────────────────────────────────────────────────────
 router.post('/auth/admin/login',    auth.adminLogin);
@@ -38,9 +39,17 @@ router.get ('/landing',             landing.getAll);
 // Push notification device token registration (works for guests too)
 router.post('/notifications/register-token', optionalUserAuth, notification.registerToken);
 
+// ── Tap Payments ────────────────────────────────────────────────────────────
+router.get ('/payments/config',      payment.config);
+router.post('/payments/tap/charge',  payment.createTapCharge);
+router.get ('/payments/tap/return',  payment.tapReturn);
+router.post('/payments/tap/webhook', payment.tapWebhook);
+router.get ('/payments/tap/status',  payment.tapStatus);
+
 // ── User authenticated ────────────────────────────────────────────────────────
 router.get ('/auth/me',             userAuth, auth.me);
 router.put ('/auth/me',             userAuth, auth.updateMe);
+router.delete('/auth/me',           userAuth, auth.terminateAccount);
 router.post('/auth/me/avatar',      userAuth, upload.single('avatar'), auth.updateAvatar);
 router.post('/orders',              userAuth, order.createOrder);
 router.post('/orders/guest',        order.createGuestOrder);

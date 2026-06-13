@@ -39,6 +39,14 @@ const { sequelize, Role, Admin, Setting, SeoPage, CmsPage, LandingSection, Landi
       { key: 'linkedin', value: '', group: 'social', label: 'LinkedIn', type: 'text' },
       { key: 'snapchat', value: '', group: 'social', label: 'Snapchat', type: 'text' },
       { key: 'whatsapp', value: '', group: 'social', label: 'WhatsApp', type: 'text' },
+      // Tap Payments — controlled from the admin "Payment" tab. Mode switches
+      // between the test and live key pairs below. Secret keys are never
+      // exposed via /settings/public (see setting.controller.js).
+      { key: 'tap_mode', value: 'test', group: 'payment', label: 'Tap Mode (test / live)', type: 'text' },
+      { key: 'tap_test_secret_key', value: '', group: 'payment', label: 'Tap Test Secret Key', type: 'text' },
+      { key: 'tap_test_publishable_key', value: '', group: 'payment', label: 'Tap Test Publishable Key', type: 'text' },
+      { key: 'tap_live_secret_key', value: '', group: 'payment', label: 'Tap Live Secret Key', type: 'text' },
+      { key: 'tap_live_publishable_key', value: '', group: 'payment', label: 'Tap Live Publishable Key', type: 'text' },
     ];
     for (const s of settings) await Setting.findOrCreate({ where: { key: s.key }, defaults: s });
 

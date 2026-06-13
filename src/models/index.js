@@ -28,7 +28,7 @@ const User = sequelize.define('User', {
   password: { type: DataTypes.STRING, allowNull: false },
   address:  { type: DataTypes.TEXT, allowNull: true },
   avatar:   { type: DataTypes.STRING, allowNull: true },
-  status:   { type: DataTypes.ENUM('active','inactive','banned'), defaultValue: 'active' },
+  status:   { type: DataTypes.ENUM('active','inactive','banned','terminated'), defaultValue: 'active' },
   password_reset_code:    { type: DataTypes.STRING(100), allowNull: true },
   password_reset_expires: { type: DataTypes.DATE, allowNull: true },
 });
@@ -142,6 +142,7 @@ const Order = sequelize.define('Order', {
   qr_code:        { type: DataTypes.TEXT('long'), allowNull: true },
   discount_code:  { type: DataTypes.STRING, allowNull: true },
   notes:          { type: DataTypes.TEXT, allowNull: true },
+  tap_charge_id:  { type: DataTypes.STRING, allowNull: true },
 });
 
 // ── Guest Order ───────────────────────────────────────────────────────────────
@@ -161,6 +162,7 @@ const GuestOrder = sequelize.define('GuestOrder', {
   order_status:   { type: DataTypes.ENUM('processing','shipped','arrived','cancelled'), defaultValue: 'processing' },
   qr_code:        { type: DataTypes.TEXT('long'), allowNull: true },
   discount_code:  { type: DataTypes.STRING, allowNull: true },
+  tap_charge_id:  { type: DataTypes.STRING, allowNull: true },
 });
 
 // ── Coupon QR Code (per-unit QR images uploaded by admin) ─────────────────────
