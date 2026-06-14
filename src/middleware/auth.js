@@ -40,4 +40,15 @@ const optionalUserAuth = async (req, res, next) => {
   next();
 };
 
-module.exports = { adminAuth, userAuth, optionalUserAuth };
+// Restricts a route to admins whose role has at least one of the given
+// permissions. An admin whose role includes the '*' permission (super admin)
+// always passes. Call with no arguments to restrict a route to super admins
+// only (e.g. managing other admins/roles).
+const requirePermission = (...perms) => (req, res, next) => {
+  const rolePerms = req.admin?.role?.permissions || [];
+  if (rolePerms.includes('*')) return next();
+  if (perms.length && perms.some((p) => rolePerms.includes(p))) return next();
+  return res.status(403).json({ success: false, message: 'You do not have permission to perform this action' });
+};
+
+module.exports = { adminAuth, userAuth, optionalUserAuth, requirePermission };
