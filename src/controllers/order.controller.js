@@ -139,6 +139,22 @@ exports.createGuestOrder = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
+exports.getOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type = 'order' } = req.query;
+    if (type === 'guest_order') {
+      const o = await GuestOrder.findByPk(id, { include: ['coupon_qr_codes'] });
+      if (!o) return res.status(404).json({ success: false, message: 'Not found' });
+      return res.json({ success: true, data: o });
+    }
+    if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const o = await Order.findOne({ where: { id, user_id: req.user.id }, include: ['coupon_qr_codes'] });
+    if (!o) return res.status(404).json({ success: false, message: 'Not found' });
+    res.json({ success: true, data: o });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
 exports.myOrders = async (req, res) => {
   try {
     const { page=1, limit=20, payment_status } = req.query;

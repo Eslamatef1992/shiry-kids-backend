@@ -56,6 +56,7 @@ router.post('/auth/me/avatar',      userAuth, upload.single('avatar'), auth.upda
 router.post('/orders',              userAuth, order.createOrder);
 router.post('/orders/guest',        order.createGuestOrder);
 router.get ('/orders/my',           userAuth, order.myOrders);
+router.get ('/orders/:id',          optionalUserAuth, order.getOrder);
 
 // ── Admin authenticated ───────────────────────────────────────────────────────
 router.get ('/auth/admin/me',       adminAuth, auth.adminMe);
