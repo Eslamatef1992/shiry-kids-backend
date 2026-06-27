@@ -14,7 +14,7 @@ async function resolveOrderItems(items) {
   for (const it of (Array.isArray(items) ? items : [])) {
     const qty = Math.max(1, parseInt(it.qty ?? it.quantity ?? 1, 10) || 1);
     if (it.type === 'coupon') {
-      const c = await Coupon.findByPk(it.id);
+      const c = await Coupon.findByPk(it.id, { include: ['vendor'] });
       if (!c) continue;
       const totalQr = await CouponQrCode.count({ where: { coupon_id: c.id } });
       if (totalQr > 0) {
@@ -27,14 +27,14 @@ async function resolveOrderItems(items) {
       const price = parseFloat(c.price);
       const lineTotal = price * qty;
       subtotal += lineTotal;
-      resolved.push({ id: c.id, type: 'coupon', name: c.title, image: c.image, price, quantity: qty, total: lineTotal });
+      resolved.push({ id: c.id, type: 'coupon', name: c.title, image: c.image, vendor_name: c.vendor?.name || null, price, quantity: qty, total: lineTotal });
     } else {
-      const p = await Product.findByPk(it.id);
+      const p = await Product.findByPk(it.id, { include: ['vendor'] });
       if (!p) continue;
       const price = parseFloat(p.price);
       const lineTotal = price * qty;
       subtotal += lineTotal;
-      resolved.push({ id: p.id, type: 'product', name: p.name, image: (p.images && p.images[0]) || null, price, quantity: qty, total: lineTotal });
+      resolved.push({ id: p.id, type: 'product', name: p.name, image: (p.images && p.images[0]) || null, vendor_name: p.vendor?.name || null, price, quantity: qty, total: lineTotal });
     }
   }
   return { resolved, subtotal, errors };
@@ -167,13 +167,50 @@ exports.myOrders = async (req, res) => {
 
 exports.adminListOrders = async (req, res) => {
   try {
-    const { page=1, limit=20, payment_status, order_status, search } = req.query;
+    const { page=1, limit=500, payment_status, order_status, search } = req.query;
     const where = {};
     if (payment_status) where.payment_status = payment_status;
     if (order_status) where.order_status = order_status;
     if (search) where.order_number = { [Op.like]: `%${search}%` };
-    const { count, rows } = await Order.findAndCountAll({ where, include: ['user'], ...paginate(page, limit), order: [['created_at','DESC']] });
-    res.json({ success: true, data: rows, meta: paginateResponse(count, page, limit) });
+
+    // Fetch registered orders + guest orders together
+    const [{ rows: orderRows }, { rows: guestRows }] = await Promise.all([
+      Order.findAndCountAll({ where, include: ['user'], ...paginate(page, limit), order: [['created_at','DESC']] }),
+      GuestOrder.findAndCountAll({ where, ...paginate(page, limit), order: [['created_at','DESC']] }),
+    ]);
+
+    // Collect all unique coupon/product IDs from items to enrich with vendor names
+    const allRows = [...orderRows.map(r => ({ ...r.toJSON(), is_guest: false })),
+                     ...guestRows.map(r => ({ ...r.toJSON(), is_guest: true }))];
+
+    const couponIds = new Set();
+    const productIds = new Set();
+    allRows.forEach(o => {
+      (Array.isArray(o.items) ? o.items : []).forEach(it => {
+        if (it.type === 'coupon') couponIds.add(it.id);
+        else if (it.type === 'product') productIds.add(it.id);
+      });
+    });
+
+    const [coupons, products] = await Promise.all([
+      couponIds.size ? Coupon.findAll({ where: { id: [...couponIds] }, include: ['vendor'], attributes: ['id','title'] }) : [],
+      productIds.size ? Product.findAll({ where: { id: [...productIds] }, include: ['vendor'], attributes: ['id','name'] }) : [],
+    ]);
+    const couponVendorMap = Object.fromEntries(coupons.map(c => [c.id, c.vendor?.name || null]));
+    const productVendorMap = Object.fromEntries(products.map(p => [p.id, p.vendor?.name || null]));
+
+    const enriched = allRows.map(o => ({
+      ...o,
+      items: (Array.isArray(o.items) ? o.items : []).map(it => ({
+        ...it,
+        vendor_name: it.vendor_name || (it.type === 'coupon' ? couponVendorMap[it.id] : productVendorMap[it.id]) || null,
+      })),
+    }));
+
+    // Sort combined list by created_at desc
+    enriched.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    res.json({ success: true, data: enriched });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
