@@ -89,8 +89,13 @@ exports.createOrder = async (req, res) => {
       delivery_fees, total, payment_method, discount_code, qr_code,
     });
     await assignCouponQrCodes(resolved, order.id, 'order');
-    const coupon_qr_codes = await CouponQrCode.findAll({ where: { order_id: order.id, order_type: 'order' } });
-    res.status(201).json({ success: true, data: { ...order.toJSON(), qr_data, coupon_qr_codes } });
+    const coupon_qr_codes = await CouponQrCode.findAll({
+      where: { order_id: order.id, order_type: 'order' },
+      attributes: ['id', 'coupon_id', 'image', 'code', 'status', 'assigned_at'],
+    });
+    const orderData = order.toJSON();
+    delete orderData.qr_code; // large base64 — not needed by Flutter
+    res.status(201).json({ success: true, data: { ...orderData, qr_data, coupon_qr_codes } });
 
     // For Cash on Delivery there's no online payment step, so the order is
     // confirmed immediately — send the confirmation email now.
@@ -134,8 +139,13 @@ exports.createGuestOrder = async (req, res) => {
       items: resolved, subtotal, discount, delivery_fees, total, payment_method, discount_code, qr_code,
     });
     await assignCouponQrCodes(resolved, order.id, 'guest_order');
-    const coupon_qr_codes = await CouponQrCode.findAll({ where: { order_id: order.id, order_type: 'guest_order' } });
-    res.status(201).json({ success: true, data: { ...order.toJSON(), qr_data, coupon_qr_codes } });
+    const coupon_qr_codes = await CouponQrCode.findAll({
+      where: { order_id: order.id, order_type: 'guest_order' },
+      attributes: ['id', 'coupon_id', 'image', 'code', 'status', 'assigned_at'],
+    });
+    const orderData = order.toJSON();
+    delete orderData.qr_code; // large base64 — not needed by Flutter
+    res.status(201).json({ success: true, data: { ...orderData, qr_data, coupon_qr_codes } });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
@@ -143,15 +153,31 @@ exports.getOrder = async (req, res) => {
   try {
     const { id } = req.params;
     const { type = 'order' } = req.query;
+
     if (type === 'guest_order') {
-      const o = await GuestOrder.findByPk(id, { include: ['coupon_qr_codes'] });
+      const o = await GuestOrder.findByPk(id);
       if (!o) return res.status(404).json({ success: false, message: 'Not found' });
-      return res.json({ success: true, data: o });
+      // Fetch QR codes explicitly (same method as createGuestOrder) for consistency
+      const coupon_qr_codes = await CouponQrCode.findAll({
+        where: { order_id: id, order_type: 'guest_order' },
+        attributes: ['id', 'coupon_id', 'image', 'code', 'status', 'assigned_at'],
+      });
+      // Strip qr_code base64 (large field not needed by the app) to keep response small
+      const data = o.toJSON();
+      delete data.qr_code;
+      return res.json({ success: true, data: { ...data, coupon_qr_codes } });
     }
+
     if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
-    const o = await Order.findOne({ where: { id, user_id: req.user.id }, include: ['coupon_qr_codes'] });
+    const o = await Order.findOne({ where: { id, user_id: req.user.id } });
     if (!o) return res.status(404).json({ success: false, message: 'Not found' });
-    res.json({ success: true, data: o });
+    const coupon_qr_codes = await CouponQrCode.findAll({
+      where: { order_id: id, order_type: 'order' },
+      attributes: ['id', 'coupon_id', 'image', 'code', 'status', 'assigned_at'],
+    });
+    const data = o.toJSON();
+    delete data.qr_code;
+    res.json({ success: true, data: { ...data, coupon_qr_codes } });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
