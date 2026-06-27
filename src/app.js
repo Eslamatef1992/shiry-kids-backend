@@ -27,6 +27,9 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Routes
 app.use('/api/v1', require('./routes'));
 
+// Swagger UI + spec (no npm package required)
+app.use('/', require('./swagger'));
+
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', version: '1.0.0', app: 'Shiry Kids API' }));
 
