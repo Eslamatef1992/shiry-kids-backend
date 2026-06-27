@@ -123,14 +123,25 @@ exports.stats = async (req, res) => {
     const { Order, GuestOrder, Product, Coupon } = require('../models');
     const { Op, fn, col, literal } = require('sequelize');
     const today = new Date(); today.setHours(0,0,0,0);
-    const [totalOrders, todayOrders, totalUsers, totalVendors, totalProducts, totalCoupons, revenueRow] = await Promise.all([
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const [
+      totalOrders, totalGuestOrders, todayOrders, todayGuestOrders,
+      totalUsers, totalVendors, totalProducts, totalCoupons,
+      revenueRow, todayRevenueRow, guestRevenueRow, pendingOrders,
+    ] = await Promise.all([
       Order.count(),
+      GuestOrder.count(),
       Order.count({ where: { created_at: { [Op.gte]: today } } }),
+      GuestOrder.count({ where: { created_at: { [Op.gte]: today } } }),
       User.count(),
       Vendor.count(),
       Product.count(),
       Coupon.count(),
       Order.sum('total', { where: { payment_status: 'paid' } }),
+      Order.sum('total', { where: { payment_status: 'paid', created_at: { [Op.gte]: today } } }),
+      GuestOrder.sum('total', { where: { payment_status: 'paid' } }),
+      Order.count({ where: { payment_status: 'pending' } }),
     ]);
 
     // Monthly orders for the last 6 months (Order + GuestOrder combined)
@@ -176,11 +187,45 @@ exports.stats = async (req, res) => {
       if (statusMap[r.order_status] !== undefined) statusMap[r.order_status] += parseInt(r.count, 10);
     });
 
+    // Most selling coupon & product (parse JSON items from all orders)
+    const [allOrders, allGuestOrders] = await Promise.all([
+      Order.findAll({ attributes: ['items'], raw: true }),
+      GuestOrder.findAll({ attributes: ['items'], raw: true }),
+    ]);
+    const itemMap = {};
+    [...allOrders, ...allGuestOrders].forEach(o => {
+      let items = o.items;
+      if (typeof items === 'string') try { items = JSON.parse(items); } catch { return; }
+      if (!Array.isArray(items)) return;
+      items.forEach(item => {
+        const key = `${item.type}::${item.id}`;
+        if (!itemMap[key]) itemMap[key] = { id: item.id, type: item.type, name: item.name, image: item.image, qty: 0 };
+        itemMap[key].qty += (item.quantity || 1);
+      });
+    });
+    const allItems = Object.values(itemMap);
+    const mostSellingCoupon = allItems.filter(i => i.type === 'coupon').sort((a, b) => b.qty - a.qty)[0] || null;
+    const mostSellingProduct = allItems.filter(i => i.type === 'product').sort((a, b) => b.qty - a.qty)[0] || null;
+
+    const BASE_URL = process.env.APP_URL || '';
+    const addBase = (img) => img ? (img.startsWith('http') ? img : `${BASE_URL}${img}`) : null;
+
     res.json({ success: true, data: {
-      totalOrders, todayOrders, totalUsers, totalVendors, totalProducts, totalCoupons,
-      revenue: revenueRow || 0,
+      totalOrders,
+      totalGuestOrders,
+      totalAllOrders: totalOrders + totalGuestOrders,
+      todayOrders: todayOrders + todayGuestOrders,
+      pendingOrders,
+      totalUsers,
+      totalVendors,
+      totalProducts,
+      totalCoupons,
+      revenue: (revenueRow || 0) + (guestRevenueRow || 0),
+      todayRevenue: todayRevenueRow || 0,
       monthlyOrders,
       orderStatusCounts: statusMap,
+      mostSellingCoupon: mostSellingCoupon ? { ...mostSellingCoupon, image: addBase(mostSellingCoupon.image) } : null,
+      mostSellingProduct: mostSellingProduct ? { ...mostSellingProduct, image: addBase(mostSellingProduct.image) } : null,
     } });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
