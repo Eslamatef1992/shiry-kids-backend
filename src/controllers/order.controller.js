@@ -43,6 +43,7 @@ async function resolveOrderItems(items) {
 // Assign the next available (unassigned, ordered by upload order) QR codes to
 // each coupon line item in a newly-created order. Coupons without any
 // uploaded QR codes are left untouched (backward compatible).
+// Exported so payment.controller.js can call it on payment confirmation.
 async function assignCouponQrCodes(resolved, orderId, orderType) {
   for (const item of resolved) {
     if (item.type !== 'coupon') continue;
@@ -58,6 +59,8 @@ async function assignCouponQrCodes(resolved, orderId, orderType) {
     }
   }
 }
+
+exports.assignCouponQrCodes = assignCouponQrCodes;
 
 exports.createOrder = async (req, res) => {
   try {
@@ -88,7 +91,12 @@ exports.createOrder = async (req, res) => {
       order_number, user_id: req.user.id, items: resolved, subtotal, discount,
       delivery_fees, total, payment_method, discount_code, qr_code,
     });
-    await assignCouponQrCodes(resolved, order.id, 'order');
+    // For COD, payment is immediate — assign QR codes and email now.
+    // For online payments (knet/visa), QR codes are assigned only after Tap
+    // confirms payment (see payment.controller.js applyChargeResult).
+    if (payment_method === 'cod') {
+      await assignCouponQrCodes(resolved, order.id, 'order');
+    }
     const coupon_qr_codes = await CouponQrCode.findAll({
       where: { order_id: order.id, order_type: 'order' },
       attributes: ['id', 'coupon_id', 'image', 'code', 'status', 'assigned_at'],
@@ -97,12 +105,6 @@ exports.createOrder = async (req, res) => {
     delete orderData.qr_code; // large base64 — not needed by Flutter
     res.status(201).json({ success: true, data: { ...orderData, qr_data, coupon_qr_codes } });
 
-    // For Cash on Delivery there's no online payment step, so the order is
-    // confirmed immediately — send the confirmation email now.
-    // For online methods (knet/visa) the email is sent later, once Tap
-    // confirms the payment (see payment.controller.js applyChargeResult),
-    // so we don't email customers about orders they never actually paid for.
-    // sendOrderConfirmationEmail never throws — failures are logged only.
     if (payment_method === 'cod') {
       sendOrderConfirmationEmail(req.user, order, coupon_qr_codes);
     }
@@ -138,7 +140,11 @@ exports.createGuestOrder = async (req, res) => {
       order_number, name: name || 'Guest', phone: phone || 'N/A', address: address || 'N/A',
       items: resolved, subtotal, discount, delivery_fees, total, payment_method, discount_code, qr_code,
     });
-    await assignCouponQrCodes(resolved, order.id, 'guest_order');
+    // Same rule: only assign QR codes immediately for COD.
+    // Online payments get QR codes assigned in applyChargeResult (payment.controller.js).
+    if (payment_method === 'cod') {
+      await assignCouponQrCodes(resolved, order.id, 'guest_order');
+    }
     const coupon_qr_codes = await CouponQrCode.findAll({
       where: { order_id: order.id, order_type: 'guest_order' },
       attributes: ['id', 'coupon_id', 'image', 'code', 'status', 'assigned_at'],

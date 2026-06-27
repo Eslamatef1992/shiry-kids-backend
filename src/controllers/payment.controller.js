@@ -1,4 +1,5 @@
 const { Order, GuestOrder, User, CouponQrCode } = require('../models');
+const { assignCouponQrCodes } = require('./order.controller');
 const { sendOrderConfirmationEmail } = require('../utils/email');
 const { getTapConfig, createCharge, retrieveCharge } = require('../utils/tap');
 
@@ -37,12 +38,20 @@ async function applyChargeResult(order, type, chargeData) {
     await order.update({ payment_status, tap_charge_id: chargeData.id || order.tap_charge_id });
   }
 
-  if (type === 'order' && payment_status === 'paid' && wasUnpaid) {
+  if (payment_status === 'paid' && wasUnpaid) {
     try {
-      const user = await User.findByPk(order.user_id);
-      const coupon_qr_codes = await CouponQrCode.findAll({ where: { order_id: order.id, order_type: 'order' } });
-      if (user) sendOrderConfirmationEmail(user, order, coupon_qr_codes);
-    } catch { /* never block on email */ }
+      // Assign QR codes now that payment is confirmed (was deferred at order creation)
+      const resolvedItems = Array.isArray(order.items) ? order.items : [];
+      await assignCouponQrCodes(resolvedItems, order.id, type);
+    } catch (e) { console.error('QR assignment error:', e.message); }
+
+    if (type === 'order') {
+      try {
+        const user = await User.findByPk(order.user_id);
+        const coupon_qr_codes = await CouponQrCode.findAll({ where: { order_id: order.id, order_type: 'order' } });
+        if (user) sendOrderConfirmationEmail(user, order, coupon_qr_codes);
+      } catch { /* never block on email */ }
+    }
   }
 
   return payment_status;
