@@ -1,4 +1,4 @@
-const { Coupon, Vendor, CouponQrCode } = require('../models');
+const { Coupon, Vendor, CouponQrCode, Order, GuestOrder, User } = require('../models');
 const { paginate, paginateResponse, decodeQrFromImage } = require('../utils/helpers');
 const { Op } = require('sequelize');
 
@@ -94,13 +94,38 @@ exports.listQrCodes = async (req, res) => {
     const coupon = await Coupon.findByPk(req.params.id);
     if (!coupon) return res.status(404).json({ success: false, message: 'Not found' });
     const items = await CouponQrCode.findAll({ where: { coupon_id: req.params.id }, order: [['id', 'ASC']] });
+
+    // Enrich assigned/used QR codes with customer name + phone
+    const assignedItems = items.filter(i => i.status !== 'unassigned' && i.order_id);
+    const orderIds     = [...new Set(assignedItems.filter(i => i.order_type === 'order').map(i => i.order_id))];
+    const guestIds     = [...new Set(assignedItems.filter(i => i.order_type === 'guest_order').map(i => i.order_id))];
+
+    const [orders, guestOrders] = await Promise.all([
+      orderIds.length  ? Order.findAll({ where: { id: orderIds }, include: [{ model: User, as: 'user', attributes: ['name','phone'] }], attributes: ['id','order_number'] }) : [],
+      guestIds.length  ? GuestOrder.findAll({ where: { id: guestIds }, attributes: ['id','order_number','name','phone'] }) : [],
+    ]);
+
+    const orderMap = Object.fromEntries(orders.map(o => [o.id, { name: o.user?.name, phone: o.user?.phone, order_number: o.order_number }]));
+    const guestMap = Object.fromEntries(guestOrders.map(o => [o.id, { name: o.name, phone: o.phone, order_number: o.order_number }]));
+
+    const enriched = items.map(i => {
+      const plain = i.toJSON();
+      if (i.status !== 'unassigned' && i.order_id) {
+        const info = i.order_type === 'guest_order' ? guestMap[i.order_id] : orderMap[i.order_id];
+        plain.customer_name   = info?.name   || null;
+        plain.customer_phone  = info?.phone  || null;
+        plain.order_number    = info?.order_number || null;
+      }
+      return plain;
+    });
+
     const summary = {
-      total: items.length,
+      total:      items.length,
       unassigned: items.filter(i => i.status === 'unassigned').length,
-      assigned: items.filter(i => i.status === 'assigned').length,
-      used: items.filter(i => i.status === 'used').length,
+      assigned:   items.filter(i => i.status === 'assigned').length,
+      used:       items.filter(i => i.status === 'used').length,
     };
-    res.json({ success: true, data: items, summary });
+    res.json({ success: true, data: enriched, summary });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
