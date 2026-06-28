@@ -299,6 +299,17 @@ const LandingItem = sequelize.define('LandingItem', {
   status:       { type: DataTypes.ENUM('active','inactive'), defaultValue: 'active' },
 });
 
+// ── Coupon Category ───────────────────────────────────────────────────────────
+const CouponCategory = sequelize.define('CouponCategory', {
+  id:      { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name:    { type: DataTypes.STRING, allowNull: false },
+  name_ar: { type: DataTypes.STRING, allowNull: true },
+  icon:    { type: DataTypes.STRING, allowNull: true },
+  slug:    { type: DataTypes.STRING, allowNull: false, unique: true },
+  sort:    { type: DataTypes.INTEGER, defaultValue: 0 },
+  status:  { type: DataTypes.ENUM('active','inactive'), defaultValue: 'active' },
+}, { tableName: 'coupon_categories', underscored: true });
+
 // ── Phone OTP ─────────────────────────────────────────────────────────────────
 const PhoneOtp = sequelize.define('PhoneOtp', {
   id:         { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -346,5 +357,5 @@ module.exports = {
   Setting, SeoPage, CmsPage, Banner, Ad,
   DeviceToken, PushNotification,
   LandingSection, LandingItem,
-  PhoneOtp,
+  PhoneOtp, CouponCategory,
 };

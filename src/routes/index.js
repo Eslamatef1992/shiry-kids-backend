@@ -20,6 +20,7 @@ const notification = require('../controllers/notification.controller');
 const landing  = require('../controllers/landing.controller');
 const payment  = require('../controllers/payment.controller');
 const qrGenerator = require('../controllers/qrGenerator.controller');
+const couponCategory = require('../controllers/couponCategory.controller');
 
 // ── Public ────────────────────────────────────────────────────────────────────
 router.post('/auth/admin/login',    auth.adminLogin);
@@ -101,6 +102,12 @@ router.delete('/products/:id',      adminAuth, canManageProducts, product.remove
 
 // Coupons (also public for Flutter)
 const canManageCoupons = requirePermission('manage_coupons');
+// Coupon categories (public read, admin write)
+router.get   ('/coupon-categories',       couponCategory.list);
+router.post  ('/coupon-categories',       adminAuth, couponCategory.create);
+router.put   ('/coupon-categories/:id',   adminAuth, couponCategory.update);
+router.delete('/coupon-categories/:id',   adminAuth, couponCategory.remove);
+
 router.get   ('/coupons',           coupon.list);
 router.get   ('/coupons/:id',       coupon.get);
 router.post  ('/coupons',           adminAuth, canManageCoupons, upload.single('image'), coupon.create);
