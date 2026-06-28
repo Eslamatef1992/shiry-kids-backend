@@ -1,7 +1,8 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { Admin, User } = require('../models');
+const { Admin, User, PhoneOtp } = require('../models');
 const { sendPasswordResetEmail } = require('../utils/email');
+const { sendSms } = require('../utils/sms');
 
 const sign = (id, type, secret = process.env.JWT_SECRET, exp = process.env.JWT_EXPIRES_IN) =>
   jwt.sign({ id, type }, secret, { expiresIn: exp });
@@ -165,5 +166,43 @@ exports.resetPassword = async (req, res) => {
     const hash = await bcrypt.hash(password, 12);
     await user.update({ password: hash, password_reset_code: null, password_reset_expires: null });
     res.json({ success: true, message: 'Password updated successfully' });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+// ── Phone OTP ─────────────────────────────────────────────────────────────────
+const OTP_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+exports.sendOtp = async (req, res) => {
+  try {
+    let { phone } = req.body;
+    if (!phone) return res.status(400).json({ success: false, message: 'Phone is required' });
+    phone = String(phone).replace(/\D/g, '');
+    if (!phone.startsWith('965')) phone = '965' + phone;
+
+    const code = String(Math.floor(1000 + Math.random() * 9000));
+    const expires_at = new Date(Date.now() + OTP_TTL_MS);
+
+    await PhoneOtp.upsert({ phone, code, expires_at });
+
+    await sendSms(phone, `Your Shiry Kids verification code is: ${code}`);
+
+    res.json({ success: true, message: 'OTP sent' });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+exports.verifyOtp = async (req, res) => {
+  try {
+    let { phone, code } = req.body;
+    if (!phone || !code) return res.status(400).json({ success: false, message: 'Phone and code are required' });
+    phone = String(phone).replace(/\D/g, '');
+    if (!phone.startsWith('965')) phone = '965' + phone;
+
+    const record = await PhoneOtp.findOne({ where: { phone } });
+    if (!record) return res.status(400).json({ success: false, message: 'No OTP found for this number' });
+    if (new Date(record.expires_at) < new Date()) return res.status(400).json({ success: false, message: 'OTP expired' });
+    if (String(record.code) !== String(code)) return res.status(400).json({ success: false, message: 'Invalid OTP' });
+
+    await record.destroy(); // consume it
+    res.json({ success: true, message: 'Phone verified' });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };

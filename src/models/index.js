@@ -296,6 +296,14 @@ const LandingItem = sequelize.define('LandingItem', {
   status:       { type: DataTypes.ENUM('active','inactive'), defaultValue: 'active' },
 });
 
+// ── Phone OTP ─────────────────────────────────────────────────────────────────
+const PhoneOtp = sequelize.define('PhoneOtp', {
+  id:         { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  phone:      { type: DataTypes.STRING(20), allowNull: false, unique: true },
+  code:       { type: DataTypes.STRING(10), allowNull: false },
+  expires_at: { type: DataTypes.DATE, allowNull: false },
+}, { tableName: 'phone_otps', underscored: true });
+
 // ── Associations ──────────────────────────────────────────────────────────────
 Admin.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
 Role.hasMany(Admin, { foreignKey: 'role_id' });
@@ -335,4 +343,5 @@ module.exports = {
   Setting, SeoPage, CmsPage, Banner, Ad,
   DeviceToken, PushNotification,
   LandingSection, LandingItem,
+  PhoneOtp,
 };

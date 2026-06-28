@@ -28,6 +28,8 @@ router.post('/auth/login',          auth.login);
 router.post('/auth/refresh',        auth.refresh);
 router.post('/auth/forgot-password',   auth.forgotPassword);
 router.post('/auth/verify-reset-code', auth.verifyResetCode);
+router.post('/auth/send-otp',          auth.sendOtp);
+router.post('/auth/verify-otp',        auth.verifyOtp);
 router.post('/auth/reset-password',    auth.resetPassword);
 router.get ('/settings/public',     settings.public);
 router.get ('/cms/:slug',           cms.get);
