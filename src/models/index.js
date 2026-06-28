@@ -114,6 +114,9 @@ const Coupon = sequelize.define('Coupon', {
   // screen (e.g. 'birthday', 'mothers_day'). Free-form string so new
   // categories can be added from the admin without a migration.
   category:        { type: DataTypes.STRING, allowNull: true },
+  // Vendor/redemption location coordinates
+  lat:             { type: DataTypes.DECIMAL(10,7), allowNull: true },
+  lng:             { type: DataTypes.DECIMAL(10,7), allowNull: true },
 });
 
 // ── Discount Coupon (promo codes for checkout) ────────────────────────────────
