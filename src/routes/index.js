@@ -21,6 +21,7 @@ const landing  = require('../controllers/landing.controller');
 const payment  = require('../controllers/payment.controller');
 const qrGenerator = require('../controllers/qrGenerator.controller');
 const couponCategory = require('../controllers/couponCategory.controller');
+const report        = require('../controllers/report.controller');
 
 // ── Public ────────────────────────────────────────────────────────────────────
 router.post('/auth/admin/login',    auth.adminLogin);
@@ -118,6 +119,10 @@ router.delete('/coupons/:id',       adminAuth, canManageCoupons, coupon.remove);
 router.get   ('/coupons/:id/qr-codes',       adminAuth, canManageCoupons, coupon.listQrCodes);
 router.post  ('/coupons/:id/qr-codes',       adminAuth, canManageCoupons, upload.array('qr_codes', 200), coupon.uploadQrCodes);
 router.delete('/coupons/:id/qr-codes/:qrId', adminAuth, canManageCoupons, coupon.removeQrCode);
+
+// Reports (admin)
+const canViewReports = requirePermission('manage_orders', 'manage_coupons');
+router.get('/admin/reports/sales', adminAuth, canViewReports, report.salesReport);
 
 // Orders (admin)
 const canManageOrders = requirePermission('manage_orders');
