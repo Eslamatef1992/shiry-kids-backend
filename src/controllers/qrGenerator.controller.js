@@ -1,6 +1,7 @@
 const XLSX = require('xlsx');
 const archiver = require('archiver');
 const qrcode = require('qrcode');
+const Jimp = require('jimp');
 
 // Matches a usable QR value: either a full URL or a code-like token
 // (letters/numbers/hyphens/underscores, no spaces). Anything else
@@ -47,11 +48,37 @@ exports.generate = async (req, res) => {
     archive.on('error', (err) => { throw err; });
     archive.pipe(res);
 
+    // Load a font for text rendering
+    const font = await Jimp.loadFont(Jimp.FONT_SANS_16_BLACK);
+
     for (let i = 0; i < values.length; i++) {
       const value = values[i];
-      const buffer = await qrcode.toBuffer(value, { width: 300, margin: 1 });
+
+      // Generate QR code at 300×300
+      const qrBuffer = await qrcode.toBuffer(value, { width: 300, margin: 2 });
+      const qrImg = await Jimp.read(qrBuffer);
+
+      // Measure text width to center it
+      const textWidth = Jimp.measureText(font, value);
+      const textHeight = Jimp.measureTextHeight(font, value, 300);
+      const padding = 10;
+      const canvasWidth = Math.max(300, textWidth + padding * 2);
+      const canvasHeight = 300 + textHeight + padding * 2;
+
+      // White canvas
+      const canvas = new Jimp(canvasWidth, canvasHeight, 0xffffffff);
+
+      // Place QR centered horizontally
+      const qrX = Math.floor((canvasWidth - 300) / 2);
+      canvas.composite(qrImg, qrX, 0);
+
+      // Print code text centered below QR
+      const textX = Math.floor((canvasWidth - textWidth) / 2);
+      canvas.print(font, textX, 300 + padding, value);
+
+      const finalBuffer = await canvas.getBufferAsync(Jimp.MIME_PNG);
       const safeName = value.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60);
-      archive.append(buffer, { name: `${String(i + 1).padStart(3, '0')}_${safeName}.png` });
+      archive.append(finalBuffer, { name: `${String(i + 1).padStart(3, '0')}_${safeName}.png` });
     }
 
     await archive.finalize();
