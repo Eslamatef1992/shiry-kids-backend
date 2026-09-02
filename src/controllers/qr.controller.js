@@ -67,6 +67,45 @@ exports.scan = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
+// ── Read-only status check (does NOT redeem or modify anything) ───────────────
+exports.check = async (req, res) => {
+  try {
+    const { qr_code } = req.body;
+    let status = 'not_found';
+    let orderData = null;
+
+    const orderNumber = qr_code.replace('SHIRY-ORDER-', '');
+    let order = await Order.findOne({ where: { order_number: orderNumber } });
+    if (!order) order = await GuestOrder.findOne({ where: { order_number: orderNumber } });
+
+    if (order) {
+      status = order.payment_status === 'paid'
+        ? (order.order_status === 'arrived' ? 'used' : 'valid')
+        : 'not_found';
+      orderData = { order_number: order.order_number, total: order.total, items: order.items };
+    } else {
+      const couponQr = await CouponQrCode.findOne({
+        where: { code: qr_code },
+        include: [{ model: Coupon, as: 'coupon' }],
+      });
+      if (couponQr) {
+        status = couponQr.status === 'used' ? 'used'
+               : couponQr.status === 'assigned' ? 'valid'
+               : 'not_found';
+        orderData = {
+          coupon: couponQr.coupon
+            ? { id: couponQr.coupon.id, title: couponQr.coupon.title, price: couponQr.coupon.price }
+            : null,
+          qr_status: couponQr.status,
+        };
+      }
+    }
+
+    // No writes — purely read-only
+    res.json({ success: true, status, order: orderData });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
 exports.history = async (req, res) => {
   try {
     const { page=1, limit=50, status } = req.query;

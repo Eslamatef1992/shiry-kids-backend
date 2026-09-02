@@ -52,8 +52,10 @@ async function buildQrImage(serial) {
 
   // Serial text centred below logo
   const font32 = await Jimp.loadFont(Jimp.FONT_SANS_32_BLACK);
-  const tw = Jimp.measureText(font32, serial);
-  canvas.print(font32, Math.max(0, Math.floor((W - tw) / 2)), logoY + LOGO_H + PAD, serial);
+  // Jimp bitmap fonts don't render hyphens — replace with space for display
+  const displaySerial = serial.replace(/-/g, ' ');
+  const tw = Jimp.measureText(font32, displaySerial);
+  canvas.print(font32, Math.max(0, Math.floor((W - tw) / 2)), logoY + LOGO_H + PAD, displaySerial);
 
   return canvas.getBufferAsync(Jimp.MIME_PNG);
 }
