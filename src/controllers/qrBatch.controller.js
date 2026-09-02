@@ -1,7 +1,10 @@
 const archiver = require('archiver');
 const qrcode   = require('qrcode');
 const Jimp     = require('jimp');
+const path     = require('path');
 const { QrBatch } = require('../models');
+
+const LOGO_PATH = path.join(__dirname, '../assets/shiry-logo.png');
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -21,37 +24,36 @@ function buildSerials(prefix, quantity) {
 
 // Generate a single branded PNG buffer for a serial code
 async function buildQrImage(serial) {
-  const SIZE   = 550;
-  const W      = 600;
-  const FOOTER = 180;
+  const QR_SIZE   = 550;
+  const W         = 600;
+  const LOGO_W    = 260;   // logo scaled width
+  const LOGO_H    = Math.round(LOGO_W * (1756 / 2748)); // preserve aspect ~166px
+  const SERIAL_H  = 60;
+  const PAD       = 16;
+  const TOTAL_H   = QR_SIZE + PAD + LOGO_H + PAD + SERIAL_H + PAD;
 
   // QR code PNG
-  const qrBuf = await qrcode.toBuffer(serial, { width: SIZE, margin: 2 });
+  const qrBuf = await qrcode.toBuffer(serial, { width: QR_SIZE, margin: 2 });
   const qrImg = await Jimp.read(qrBuf);
 
-  // Canvas: QR + footer area
-  const canvas = new Jimp(W, SIZE + FOOTER, 0xffffffff);
+  // Logo
+  const logoImg = await Jimp.read(LOGO_PATH);
+  logoImg.resize(LOGO_W, LOGO_H);
 
-  // Place QR centred
-  canvas.composite(qrImg, Math.floor((W - SIZE) / 2), 0);
+  // White canvas
+  const canvas = new Jimp(W, TOTAL_H, 0xffffffff);
 
-  // Fonts
+  // Composite QR centred at top
+  canvas.composite(qrImg, Math.floor((W - QR_SIZE) / 2), 0);
+
+  // Composite logo centred below QR
+  const logoY = QR_SIZE + PAD;
+  canvas.composite(logoImg, Math.floor((W - LOGO_W) / 2), logoY);
+
+  // Serial text centred below logo
   const font32 = await Jimp.loadFont(Jimp.FONT_SANS_32_BLACK);
-  const font16 = await Jimp.loadFont(Jimp.FONT_SANS_16_BLACK);
-
-  const brandEn  = 'Shiry Kids Fun';
-  const brandAr  = 'Shiry Kids Fun --';          // Arabic renders as blocks in Jimp; use transliteration
-  const serialLn = serial;
-
-  // Helper to centre-print text
-  const printCentre = (font, text, y) => {
-    const tw = Jimp.measureText(font, text);
-    canvas.print(font, Math.max(0, Math.floor((W - tw) / 2)), y, text);
-  };
-
-  printCentre(font32, brandEn,  SIZE + 10);
-  printCentre(font16, brandAr,  SIZE + 58);
-  printCentre(font32, serialLn, SIZE + 90);
+  const tw = Jimp.measureText(font32, serial);
+  canvas.print(font32, Math.max(0, Math.floor((W - tw) / 2)), logoY + LOGO_H + PAD, serial);
 
   return canvas.getBufferAsync(Jimp.MIME_PNG);
 }
