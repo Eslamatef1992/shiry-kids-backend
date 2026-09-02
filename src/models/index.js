@@ -310,6 +310,13 @@ const CouponCategory = sequelize.define('CouponCategory', {
   status:  { type: DataTypes.ENUM('active','inactive'), defaultValue: 'active' },
 }, { tableName: 'coupon_categories', underscored: true });
 
+// ── QR Batch ──────────────────────────────────────────────────────────────────
+const QrBatch = sequelize.define('QrBatch', {
+  id:       { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  prefix:   { type: DataTypes.STRING, allowNull: false },
+  quantity: { type: DataTypes.INTEGER, allowNull: false },
+}, { tableName: 'qr_batches', underscored: true });
+
 // ── Phone OTP ─────────────────────────────────────────────────────────────────
 const PhoneOtp = sequelize.define('PhoneOtp', {
   id:         { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -357,5 +364,5 @@ module.exports = {
   Setting, SeoPage, CmsPage, Banner, Ad,
   DeviceToken, PushNotification,
   LandingSection, LandingItem,
-  PhoneOtp, CouponCategory,
+  PhoneOtp, CouponCategory, QrBatch,
 };

@@ -22,6 +22,7 @@ const payment  = require('../controllers/payment.controller');
 const qrGenerator = require('../controllers/qrGenerator.controller');
 const couponCategory = require('../controllers/couponCategory.controller');
 const report        = require('../controllers/report.controller');
+const qrBatch       = require('../controllers/qrBatch.controller');
 
 // ── Public ────────────────────────────────────────────────────────────────────
 router.post('/auth/admin/login',    auth.adminLogin);
@@ -137,6 +138,12 @@ router.get ('/qr/history',          adminAuth, canScanQr, qr.history);
 
 // QR Code Generator (bulk-generate QR images from an uploaded Excel/CSV)
 router.post('/qr-codes/generate',   adminAuth, canScanQr, uploadExcel.single('file'), qrGenerator.generate);
+
+// ── QR Batches (super admin only) ─────────────────────────────────────────────
+router.get   ('/qr-batches',              adminAuth, superAdminOnly, qrBatch.list);
+router.post  ('/qr-batches',              adminAuth, superAdminOnly, qrBatch.create);
+router.get   ('/qr-batches/:id/download', adminAuth, superAdminOnly, qrBatch.download);
+router.delete('/qr-batches/:id',          adminAuth, superAdminOnly, qrBatch.remove);
 
 // Discount coupons (admin CRUD)
 router.get   ('/discount-coupons',  adminAuth, canManageCoupons, dc.list);
