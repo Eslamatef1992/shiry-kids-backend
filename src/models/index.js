@@ -312,9 +312,10 @@ const CouponCategory = sequelize.define('CouponCategory', {
 
 // ── QR Batch ──────────────────────────────────────────────────────────────────
 const QrBatch = sequelize.define('QrBatch', {
-  id:       { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  prefix:   { type: DataTypes.STRING, allowNull: false },
-  quantity: { type: DataTypes.INTEGER, allowNull: false },
+  id:           { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  prefix:       { type: DataTypes.STRING, allowNull: false },
+  quantity:     { type: DataTypes.INTEGER, allowNull: false },
+  vendor_logo:  { type: DataTypes.STRING, allowNull: true },
 }, { tableName: 'qr_batches', underscored: true });
 
 // ── Phone OTP ─────────────────────────────────────────────────────────────────
