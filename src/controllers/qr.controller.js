@@ -67,41 +67,67 @@ exports.scan = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
-// ── Read-only status check (does NOT redeem or modify anything) ───────────────
+// ── Check + redeem on first valid scan (one-time use enforced) ───────────────
 exports.check = async (req, res) => {
   try {
     const { qr_code } = req.body;
-    let status = 'not_found';
-    let orderData = null;
+    let order = null, order_type = null, status = 'not_found';
+    let couponQr = null;
 
     const orderNumber = qr_code.replace('SHIRY-ORDER-', '');
-    let order = await Order.findOne({ where: { order_number: orderNumber } });
-    if (!order) order = await GuestOrder.findOne({ where: { order_number: orderNumber } });
-
+    order = await Order.findOne({ where: { order_number: orderNumber } });
     if (order) {
+      order_type = 'order';
       status = order.payment_status === 'paid'
         ? (order.order_status === 'arrived' ? 'used' : 'valid')
         : 'not_found';
-      orderData = { order_number: order.order_number, total: order.total, items: order.items };
     } else {
-      const couponQr = await CouponQrCode.findOne({
+      order = await GuestOrder.findOne({ where: { order_number: orderNumber } });
+      if (order) {
+        order_type = 'guest_order';
+        status = order.payment_status === 'paid'
+          ? (order.order_status === 'arrived' ? 'used' : 'valid')
+          : 'not_found';
+      }
+    }
+
+    if (!order) {
+      couponQr = await CouponQrCode.findOne({
         where: { code: qr_code },
         include: [{ model: Coupon, as: 'coupon' }],
       });
       if (couponQr) {
-        status = couponQr.status === 'used' ? 'used'
+        status = couponQr.status === 'used'     ? 'used'
                : couponQr.status === 'assigned' ? 'valid'
                : 'not_found';
-        orderData = {
-          coupon: couponQr.coupon
-            ? { id: couponQr.coupon.id, title: couponQr.coupon.title, price: couponQr.coupon.price }
-            : null,
-          qr_status: couponQr.status,
-        };
       }
     }
 
-    // No writes — purely read-only
+    // Mark as used on first valid scan (one-time enforcement)
+    if (status === 'valid' && order)     await order.update({ order_status: 'arrived' });
+    if (status === 'valid' && couponQr)  await couponQr.update({ status: 'used' });
+
+    // Log the scan
+    await QrScanLog.create({
+      admin_id:   req.admin.id,
+      qr_code,
+      order_id:   order?.id || couponQr?.order_id || null,
+      order_type: order_type || couponQr?.order_type || null,
+      status,
+    });
+
+    let orderData = null;
+    if (order) {
+      orderData = { order_number: order.order_number, total: order.total, items: order.items };
+    } else if (couponQr) {
+      orderData = {
+        coupon: couponQr.coupon
+          ? { id: couponQr.coupon.id, title: couponQr.coupon.title, price: couponQr.coupon.price }
+          : null,
+        qr_status: couponQr.status,
+      };
+    }
+
     res.json({ success: true, status, order: orderData });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
