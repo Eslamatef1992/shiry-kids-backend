@@ -142,7 +142,7 @@ router.post('/qr-codes/generate',   adminAuth, canScanQr, uploadExcel.single('fi
 
 // ── QR Batches (super admin only) ─────────────────────────────────────────────
 router.get   ('/qr-batches',              adminAuth, superAdminOnly, qrBatch.list);
-router.post  ('/qr-batches',              adminAuth, superAdminOnly, upload.single('vendor_logo'), qrBatch.create);
+router.post  ('/qr-batches',              adminAuth, superAdminOnly, upload.fields([{ name: 'vendor_logo', maxCount: 1 }, { name: 'shiry_logo', maxCount: 1 }]), qrBatch.create);
 router.get   ('/qr-batches/:id/download', adminAuth, superAdminOnly, qrBatch.download);
 router.delete('/qr-batches/:id',          adminAuth, superAdminOnly, qrBatch.remove);
 

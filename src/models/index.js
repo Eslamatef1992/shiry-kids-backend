@@ -316,6 +316,7 @@ const QrBatch = sequelize.define('QrBatch', {
   prefix:       { type: DataTypes.STRING, allowNull: false },
   quantity:     { type: DataTypes.INTEGER, allowNull: false },
   vendor_logo:  { type: DataTypes.STRING, allowNull: true },
+  shiry_logo:   { type: DataTypes.STRING, allowNull: true },
 }, { tableName: 'qr_batches', underscored: true });
 
 // ── Phone OTP ─────────────────────────────────────────────────────────────────
