@@ -103,6 +103,7 @@ const Coupon = sequelize.define('Coupon', {
   terms_and_conditions:    { type: DataTypes.TEXT, allowNull: true },
   terms_and_conditions_ar: { type: DataTypes.TEXT, allowNull: true },
   image:           { type: DataTypes.STRING, allowNull: true },
+  detail_image:    { type: DataTypes.STRING, allowNull: true },
   price:           { type: DataTypes.DECIMAL(10,3), allowNull: false },
   original_price:  { type: DataTypes.DECIMAL(10,3), allowNull: true },
   discount_percent:{ type: DataTypes.INTEGER, defaultValue: 0 },

@@ -112,8 +112,8 @@ router.delete('/coupon-categories/:id',   adminAuth, couponCategory.remove);
 
 router.get   ('/coupons',           coupon.list);
 router.get   ('/coupons/:id',       coupon.get);
-router.post  ('/coupons',           adminAuth, canManageCoupons, upload.single('image'), coupon.create);
-router.put   ('/coupons/:id',       adminAuth, canManageCoupons, upload.single('image'), coupon.update);
+router.post  ('/coupons',           adminAuth, canManageCoupons, upload.fields([{ name: 'image', maxCount: 1 }, { name: 'detail_image', maxCount: 1 }]), coupon.create);
+router.put   ('/coupons/:id',       adminAuth, canManageCoupons, upload.fields([{ name: 'image', maxCount: 1 }, { name: 'detail_image', maxCount: 1 }]), coupon.update);
 router.delete('/coupons/:id',       adminAuth, canManageCoupons, coupon.remove);
 
 // Coupon QR codes (admin) — bulk-upload per-unit QR images

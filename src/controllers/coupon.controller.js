@@ -61,7 +61,8 @@ exports.get = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const data = buildCouponData(req.body);
-    if (req.file) data.image = `/uploads/${req.file.filename}`;
+    if (req.files?.image?.[0])         data.image        = `/uploads/${req.files.image[0].filename}`;
+    if (req.files?.detail_image?.[0])  data.detail_image = `/uploads/${req.files.detail_image[0].filename}`;
     const coupon = await Coupon.create(data);
     res.status(201).json({ success: true, data: coupon });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
@@ -72,7 +73,8 @@ exports.update = async (req, res) => {
     const coupon = await Coupon.findByPk(req.params.id);
     if (!coupon) return res.status(404).json({ success: false, message: 'Not found' });
     const data = buildCouponData(req.body);
-    if (req.file) data.image = `/uploads/${req.file.filename}`;
+    if (req.files?.image?.[0])         data.image        = `/uploads/${req.files.image[0].filename}`;
+    if (req.files?.detail_image?.[0])  data.detail_image = `/uploads/${req.files.detail_image[0].filename}`;
     await coupon.update(data);
     res.json({ success: true, data: coupon });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
