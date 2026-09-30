@@ -160,14 +160,28 @@ exports.redeem = async (req, res) => {
 
     // Must not already be redeemed
     const existing = await QrRedemption.findOne({ where: { qr_code } });
-    if (existing) return res.status(409).json({ success: false, message: 'QR code already redeemed' });
+    if (existing) return res.status(409).json({ success: false, message: 'QR code already redeemed', status: 'already_redeemed' });
 
-    // Resolve coupon name + purchase amount from the QR code
-    let coupon_name = null, purchase_amount = null, order_id = null, order_type = null;
-
+    // Validate the code exists and has been scanned (used) first
     const orderNumber = qr_code.replace('SHIRY-ORDER-', '');
     const order = await Order.findOne({ where: { order_number: orderNumber } }) ||
                   await GuestOrder.findOne({ where: { order_number: orderNumber } });
+    const couponQr = !order
+      ? await CouponQrCode.findOne({ where: { code: qr_code }, include: [{ model: Coupon, as: 'coupon' }] })
+      : null;
+
+    if (!order && !couponQr)
+      return res.status(404).json({ success: false, message: 'QR code not found', status: 'not_found' });
+
+    // Must be in used state — cannot redeem a code that hasn't been scanned yet
+    const isUsed = order
+      ? (order.order_status === 'arrived' && order.payment_status === 'paid')
+      : couponQr.status === 'used';
+    if (!isUsed)
+      return res.status(400).json({ success: false, message: 'QR code has not been scanned yet', status: 'not_used' });
+
+    // Resolve coupon name + purchase amount
+    let coupon_name = null, purchase_amount = null, order_id = null, order_type = null;
 
     if (order) {
       purchase_amount = order.total;
@@ -177,17 +191,11 @@ exports.redeem = async (req, res) => {
       const items = order.items || [];
       const couponItem = items.find(i => i.type === 'coupon' || i.coupon_id);
       if (couponItem) coupon_name = couponItem.title || couponItem.name || null;
-    } else {
-      const couponQr = await CouponQrCode.findOne({
-        where: { code: qr_code },
-        include: [{ model: Coupon, as: 'coupon' }],
-      });
-      if (couponQr) {
-        coupon_name     = couponQr.coupon?.title || null;
-        purchase_amount = couponQr.coupon?.price || null;
-        order_id        = couponQr.order_id;
-        order_type      = couponQr.order_type;
-      }
+    } else if (couponQr) {
+      coupon_name     = couponQr.coupon?.title || null;
+      purchase_amount = couponQr.coupon?.price || null;
+      order_id        = couponQr.order_id;
+      order_type      = couponQr.order_type;
     }
 
     const redemption = await QrRedemption.create({
