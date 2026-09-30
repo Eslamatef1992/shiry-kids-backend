@@ -320,6 +320,17 @@ const QrBatch = sequelize.define('QrBatch', {
   shiry_logo:   { type: DataTypes.STRING, allowNull: true },
 }, { tableName: 'qr_batches', underscored: true });
 
+// ── QR Redemption ─────────────────────────────────────────────────────────────
+const QrRedemption = sequelize.define('QrRedemption', {
+  id:              { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  qr_code:         { type: DataTypes.STRING, allowNull: false },
+  admin_id:        { type: DataTypes.INTEGER, references: { model: 'admins', key: 'id' } },
+  coupon_name:     { type: DataTypes.STRING, allowNull: true },
+  purchase_amount: { type: DataTypes.DECIMAL(10, 3), allowNull: true },
+  order_id:        { type: DataTypes.INTEGER, allowNull: true },
+  order_type:      { type: DataTypes.ENUM('order', 'guest_order'), allowNull: true },
+}, { tableName: 'qr_redemptions', underscored: true });
+
 // ── Phone OTP ─────────────────────────────────────────────────────────────────
 const PhoneOtp = sequelize.define('PhoneOtp', {
   id:         { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -352,6 +363,7 @@ Order.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 User.hasMany(Order, { foreignKey: 'user_id' });
 
 QrScanLog.belongsTo(Admin, { foreignKey: 'admin_id', as: 'admin' });
+QrRedemption.belongsTo(Admin, { foreignKey: 'admin_id', as: 'admin' });
 
 Ad.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
 Ad.belongsTo(Coupon, { foreignKey: 'coupon_id', as: 'coupon' });
@@ -363,7 +375,7 @@ module.exports = {
   sequelize,
   Role, Admin, User, Vendor, Category,
   Product, ProductVariant, Coupon, DiscountCoupon, CouponQrCode,
-  Order, GuestOrder, QrScanLog,
+  Order, GuestOrder, QrScanLog, QrRedemption,
   Setting, SeoPage, CmsPage, Banner, Ad,
   DeviceToken, PushNotification,
   LandingSection, LandingItem,
