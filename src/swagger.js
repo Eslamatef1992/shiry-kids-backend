@@ -208,7 +208,8 @@ const spec = {
           description: { type: 'string' }, description_ar: { type: 'string' },
           status: { type: 'string', enum: ['active','inactive','expired'] },
           coupon_count: { type: 'integer' },
-          image: { type: 'string', format: 'binary' },
+          image:        { type: 'string', format: 'binary', description: 'Cover image shown in the coupon list' },
+          detail_image: { type: 'string', format: 'binary', description: 'Detail image shown when the coupon is opened' },
         }}}}},
         responses: { 201: { description: 'Coupon created' } },
       },
@@ -216,10 +217,19 @@ const spec = {
     '/coupons/{id}': {
       get:    { tags: ['Coupons'], summary: 'Get coupon by ID (public)',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
-        responses: { 200: { description: 'Coupon detail' } },
+        responses: { 200: { description: 'Coupon detail — includes `image` (cover) and `detail_image` (opened view) URLs' } },
       },
       put:    { tags: ['Coupons'], summary: 'Admin — update coupon', security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        requestBody: { required: false, content: { 'multipart/form-data': { schema: { type: 'object', properties: {
+          title: { type: 'string' }, title_ar: { type: 'string' }, price: { type: 'number' },
+          vendor_id: { type: 'integer' }, category_id: { type: 'integer' },
+          description: { type: 'string' }, description_ar: { type: 'string' },
+          status: { type: 'string', enum: ['active','inactive','expired'] },
+          coupon_count: { type: 'integer' },
+          image:        { type: 'string', format: 'binary', description: 'Replace cover image (optional)' },
+          detail_image: { type: 'string', format: 'binary', description: 'Replace detail image (optional)' },
+        }}}}},
         responses: { 200: { description: 'Updated' } },
       },
       delete: { tags: ['Coupons'], summary: 'Admin — delete coupon', security: [{ bearerAuth: [] }],
@@ -385,16 +395,140 @@ const spec = {
     // QR SCANNER
     // ────────────────────────────────────────────────
     '/qr/scan': {
-      post: { tags: ['QR'], summary: 'Admin — scan a coupon QR code to mark as used', security: [{ bearerAuth: [] }],
-        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: {
-          qr_data: { type: 'string', description: 'The decoded text from the QR code' },
+      post: { tags: ['QR'], summary: 'Admin — scan & redeem a QR code (marks as used)', security: [{ bearerAuth: [] }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['qr_code'], properties: {
+          qr_code: { type: 'string', description: 'Decoded text from the QR code' },
         }}}}},
-        responses: { 200: { description: 'QR marked as used' }, 404: { description: 'QR not found' } },
+        responses: { 200: { description: 'status: valid | used | not_found' }, 500: { description: 'Server error' } },
+      },
+    },
+    '/qr/check': {
+      post: {
+        tags: ['QR'],
+        summary: 'Scanner — check & auto-redeem on first scan (one-time use)',
+        description: [
+          'Used by the scanner mobile app. On the **first** valid scan the code is immediately marked as used.',
+          '',
+          '**Status values returned:**',
+          '- `valid` — first scan; code is now marked used.',
+          '- `used` — code was scanned before but not yet redeemed by super admin.',
+          '- `redeemed` — code was scanned AND the super admin already pressed Redeem. Full redemption detail is included.',
+          '- `not_found` — QR code does not exist in the system.',
+        ].join('\n'),
+        security: [{ bearerAuth: [] }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['qr_code'], properties: {
+          qr_code: { type: 'string', example: 'ICE-C1', description: 'Decoded text from the QR code' },
+        }}}}},
+        responses: {
+          200: {
+            description: 'Scan result',
+            content: { 'application/json': { schema: { type: 'object', properties: {
+              success:  { type: 'boolean', example: true },
+              status:   { type: 'string', enum: ['valid', 'used', 'redeemed', 'not_found'], example: 'valid' },
+              message:  { type: 'string', example: 'QR code scanned successfully' },
+              order:    { type: 'object', nullable: true, description: 'Order or coupon detail (null for not_found)', properties: {
+                order_number:    { type: 'string', example: 'ORD-0001' },
+                total:           { type: 'number', example: 5.0 },
+                coupon:          { type: 'object', nullable: true, properties: {
+                  id:    { type: 'integer' },
+                  title: { type: 'string' },
+                  price: { type: 'number' },
+                }},
+              }},
+              redemption: {
+                type: 'object', nullable: true,
+                description: 'Only present when status = "redeemed"',
+                properties: {
+                  redeemed_at:     { type: 'string', format: 'date-time', example: '2026-09-30T10:00:00.000Z' },
+                  redeemed_day:    { type: 'string', example: 'Wednesday' },
+                  redeemed_by:     { type: 'string', example: 'Ahmed Ali' },
+                  coupon_name:     { type: 'string', example: 'Cozmo Discount Card' },
+                  purchase_amount: { type: 'number', example: 5.0 },
+                },
+              },
+            }}},
+          },
+        },
+      },
+    },
+    '/qr/redeem': {
+      post: {
+        tags: ['QR'],
+        summary: 'Super admin — redeem a scanned (used) QR code',
+        description: [
+          'Moves a code from the **Used** tab to the **Redeemed** tab.',
+          '',
+          '**Rules:**',
+          '- Code must already be in `used` state (scanned at least once).',
+          '- Cannot redeem a code that is still `valid` (not yet scanned).',
+          '- Cannot redeem the same code twice.',
+        ].join('\n'),
+        security: [{ bearerAuth: [] }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['qr_code'], properties: {
+          qr_code: { type: 'string', example: 'ICE-C1', description: 'The QR code string to redeem' },
+        }}}}},
+        responses: {
+          201: {
+            description: 'Redeemed successfully',
+            content: { 'application/json': { schema: { type: 'object', properties: {
+              success: { type: 'boolean', example: true },
+              message: { type: 'string', example: 'QR code redeemed successfully' },
+              redemption: { type: 'object', properties: {
+                id:              { type: 'integer', example: 1 },
+                redeemed_at:     { type: 'string', format: 'date-time', example: '2026-09-30T10:00:00.000Z' },
+                redeemed_day:    { type: 'string', example: 'Wednesday' },
+                redeemed_by:     { type: 'string', example: 'Ahmed Ali' },
+                coupon_name:     { type: 'string', example: 'Cozmo Discount Card' },
+                purchase_amount: { type: 'number', example: 5.0 },
+              }},
+            }}},
+          },
+          400: { description: '`{ "success": false, "message": "QR code has not been scanned yet", "status": "not_used" }`' },
+          404: { description: '`{ "success": false, "message": "QR code not found", "status": "not_found" }`' },
+          409: { description: '`{ "success": false, "message": "QR code already redeemed", "status": "already_redeemed" }`' },
+        },
+      },
+    },
+    '/qr/redemptions': {
+      get: {
+        tags: ['QR'],
+        summary: 'Super admin — list all redeemed QR codes (Redeemed tab)',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'page',  in: 'query', schema: { type: 'integer', default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 50 } },
+        ],
+        responses: {
+          200: {
+            description: 'Redemptions list',
+            content: { 'application/json': { schema: { type: 'object', properties: {
+              success: { type: 'boolean', example: true },
+              data: { type: 'array', items: { type: 'object', properties: {
+                id:              { type: 'integer', example: 1 },
+                qr_code:         { type: 'string', example: 'ICE-C1' },
+                redeemed_at:     { type: 'string', format: 'date-time', example: '2026-09-30T10:00:00.000Z' },
+                redeemed_day:    { type: 'string', example: 'Wednesday' },
+                redeemed_by:     { type: 'string', example: 'Ahmed Ali' },
+                coupon_name:     { type: 'string', example: 'Cozmo Discount Card' },
+                purchase_amount: { type: 'number', example: 5.0 },
+              }}},
+            }}},
+          },
+        },
       },
     },
     '/qr/history': {
-      get: { tags: ['QR'], summary: 'Admin — scan history log', security: [{ bearerAuth: [] }],
-        responses: { 200: { description: 'List of scan events' } },
+      get: {
+        tags: ['QR'],
+        summary: 'Admin — scan history log',
+        description: 'Returns all scan events. Status in each record reflects what happened at scan time (`valid` or `used`). Redemption is a separate action tracked in `/qr/redemptions`.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['valid', 'used', 'not_found'] } },
+          { name: 'page',   in: 'query', schema: { type: 'integer', default: 1 } },
+          { name: 'limit',  in: 'query', schema: { type: 'integer', default: 50 } },
+        ],
+        responses: { 200: { description: 'List of scan log entries' } },
       },
     },
     '/qr-codes/generate': {
