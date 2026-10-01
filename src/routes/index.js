@@ -135,8 +135,8 @@ router.patch('/admin/orders/:id',   adminAuth, canManageOrders, order.updateOrde
 const canScanQr = requirePermission('scan_qr');
 router.post('/qr/scan',             adminAuth, canScanQr,    qr.scan);
 router.post('/qr/check',            adminAuth, canScanQr,    qr.check);
-router.post('/qr/redeem',           adminAuth, superAdminOnly, qr.redeem);
-router.get ('/qr/redemptions',      adminAuth, superAdminOnly, qr.redemptions);
+router.post('/qr/redeem',           adminAuth, canScanQr, qr.redeem);
+router.get ('/qr/redemptions',      adminAuth, canScanQr, qr.redemptions);
 router.get ('/qr/history',          adminAuth, canScanQr,    qr.history);
 
 // QR Code Generator (bulk-generate QR images from an uploaded Excel/CSV)

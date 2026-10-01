@@ -454,7 +454,7 @@ const spec = {
     '/qr/redeem': {
       post: {
         tags: ['QR'],
-        summary: 'Super admin — redeem a scanned (used) QR code',
+        summary: 'Scanner admin — redeem a scanned (used) QR code',
         description: [
           'Moves a code from the **Used** tab to the **Redeemed** tab.',
           '',
@@ -492,7 +492,7 @@ const spec = {
     '/qr/redemptions': {
       get: {
         tags: ['QR'],
-        summary: 'Super admin — list all redeemed QR codes (Redeemed tab)',
+        summary: 'Scanner admin — list all redeemed QR codes (Redeemed tab)',
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: 'page',  in: 'query', schema: { type: 'integer', default: 1 } },
