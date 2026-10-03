@@ -6,6 +6,7 @@ const TRUE_VALUES = ['true', '1', 1, true];
 const buildCouponData = (body) => {
   const data = { ...body };
   if (data.featured !== undefined) data.featured = TRUE_VALUES.includes(data.featured);
+  if (data.featured_home !== undefined) data.featured_home = TRUE_VALUES.includes(data.featured_home);
   return data;
 };
 
