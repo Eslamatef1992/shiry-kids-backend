@@ -235,3 +235,44 @@ exports.stats = async (req, res) => {
     } });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
+
+// ── GET /admin/vendor-performance ─────────────────────────────────────────────
+exports.vendorPerformance = async (req, res) => {
+  try {
+    const { Coupon, CouponQrCode, QrScanLog, QrRedemption } = require('../models');
+    const { fn, col, Op: SeqOp } = require('sequelize');
+
+    const vendors = await Vendor.findAll({ order: [['name', 'ASC']] });
+    if (!vendors.length) return res.json({ success: true, data: [] });
+
+    const data = await Promise.all(vendors.map(async (v) => {
+      const scannerIds = await Admin.findAll({
+        where: { vendor_id: v.id }, attributes: ['id'],
+      }).then(rows => rows.map(r => r.id));
+
+      const [totalCoupons, totalSold, totalScanned, revenueRow, scannerCount] = await Promise.all([
+        Coupon.count({ where: { vendor_id: v.id } }),
+        CouponQrCode.count({
+          where: { status: { [SeqOp.in]: ['assigned','used'] } },
+          include: [{ model: Coupon, as: 'coupon', where: { vendor_id: v.id }, attributes: [] }],
+        }),
+        scannerIds.length ? QrScanLog.count({ where: { admin_id: { [SeqOp.in]: scannerIds }, status: 'valid' } }) : 0,
+        scannerIds.length ? QrRedemption.findOne({
+          where: { admin_id: { [SeqOp.in]: scannerIds } },
+          attributes: [[fn('SUM', col('purchase_amount')), 'total']],
+          raw: true,
+        }) : null,
+        Admin.count({ where: { vendor_id: v.id } }),
+      ]);
+
+      return {
+        id: v.id, name: v.name, logo: v.logo, status: v.status,
+        totalCoupons, totalSold, totalScanned,
+        totalRevenue: parseFloat(revenueRow?.total || 0),
+        scannerCount,
+      };
+    }));
+
+    res.json({ success: true, data });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};

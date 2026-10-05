@@ -268,11 +268,22 @@ exports.redemptions = async (req, res) => {
 
     if (!scannerIds.length) return res.json({ success: true, data: [] });
 
-    const redemptions = await QrRedemption.findAll({
-      where: { admin_id: { [Op.in]: scannerIds } },
+    const page  = Math.max(1, parseInt(req.query.page  || 1, 10));
+    const limit = Math.min(100, parseInt(req.query.limit || 50, 10));
+    const offset = (page - 1) * limit;
+
+    const dateWhere = {};
+    if (req.query.from) dateWhere[Op.gte] = new Date(req.query.from);
+    if (req.query.to)   dateWhere[Op.lte] = new Date(new Date(req.query.to).setHours(23,59,59,999));
+    const rdWhere = { admin_id: { [Op.in]: scannerIds } };
+    if (Object.keys(dateWhere).length) rdWhere.created_at = dateWhere;
+
+    const { count: total, rows: redemptions } = await QrRedemption.findAndCountAll({
+      where: rdWhere,
       include: [{ model: Admin, as: 'admin', attributes: ['id', 'name'] }],
       order: [['created_at', 'DESC']],
-      limit: 200,
+      limit,
+      offset,
     });
 
     // Enrich with client name from order
@@ -315,7 +326,174 @@ exports.redemptions = async (req, res) => {
       };
     }));
 
-    res.json({ success: true, data: enriched });
+    res.json({ success: true, data: enriched, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+// ── GET /vendor/customers ─────────────────────────────────────────────────────
+// Unique customers who redeemed coupons from this vendor
+exports.customers = async (req, res) => {
+  try {
+    if (!requireVendor(req, res)) return;
+    const vendorId = req.admin.vendor_id;
+
+    const scannerIds = await Admin.findAll({
+      where: { vendor_id: vendorId }, attributes: ['id'],
+    }).then(rows => rows.map(r => r.id));
+
+    if (!scannerIds.length) return res.json({ success: true, data: [] });
+
+    const redemptions = await QrRedemption.findAll({
+      where: { admin_id: { [Op.in]: scannerIds } },
+      order: [['created_at', 'DESC']],
+    });
+
+    // Aggregate by order to get customer details
+    const customerMap = {};
+    await Promise.all(redemptions.map(async (r) => {
+      const row = r.toJSON();
+      let key = null, name = '—', phone = '—', purchasedAt = row.createdAt;
+      try {
+        if (row.order_id && row.order_type === 'order') {
+          const order = await Order.findByPk(row.order_id, {
+            include: [{ model: User, as: 'user', attributes: ['id','name','phone'] }],
+          });
+          if (order?.user) {
+            key = `user_${order.user.id}`;
+            name = order.user.name || '—';
+            phone = order.user.phone || '—';
+            purchasedAt = order.createdAt;
+          }
+        } else if (row.order_id && row.order_type === 'guest_order') {
+          const go = await GuestOrder.findByPk(row.order_id, { attributes: ['name','phone','created_at'] });
+          if (go) {
+            key = `guest_${row.order_id}`;
+            name = go.name || '—';
+            phone = go.phone || '—';
+            purchasedAt = go.createdAt;
+          }
+        }
+      } catch (_) {}
+
+      if (!key) return;
+      if (!customerMap[key]) {
+        customerMap[key] = { key, name, phone, firstPurchase: purchasedAt, lastPurchase: purchasedAt, totalSpent: 0, redemptionCount: 0 };
+      }
+      customerMap[key].redemptionCount++;
+      customerMap[key].totalSpent += parseFloat(row.purchase_amount || 0);
+      if (new Date(purchasedAt) < new Date(customerMap[key].firstPurchase)) customerMap[key].firstPurchase = purchasedAt;
+      if (new Date(purchasedAt) > new Date(customerMap[key].lastPurchase))  customerMap[key].lastPurchase  = purchasedAt;
+    }));
+
+    const data = Object.values(customerMap).sort((a, b) => b.totalSpent - a.totalSpent);
+    res.json({ success: true, data });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+// ── GET /vendor/coupons/:id/detail ───────────────────────────────────────────
+exports.couponDetail = async (req, res) => {
+  try {
+    if (!requireVendor(req, res)) return;
+    const coupon = await Coupon.findOne({ where: { id: req.params.id, vendor_id: req.admin.vendor_id } });
+    if (!coupon) return res.status(404).json({ success: false, message: 'Coupon not found' });
+
+    const { fn, col } = require('sequelize');
+
+    const [sold, redeemed] = await Promise.all([
+      CouponQrCode.count({ where: { coupon_id: coupon.id, status: { [Op.in]: ['assigned','used'] } } }),
+      CouponQrCode.count({ where: { coupon_id: coupon.id, status: 'used' } }),
+    ]);
+
+    const scannerIds = await Admin.findAll({
+      where: { vendor_id: req.admin.vendor_id }, attributes: ['id'],
+    }).then(rows => rows.map(r => r.id));
+
+    const redemptions = await QrRedemption.findAll({
+      where: { admin_id: { [Op.in]: scannerIds }, coupon_name: coupon.title },
+      include: [{ model: Admin, as: 'admin', attributes: ['name'] }],
+      order: [['created_at', 'DESC']],
+      limit: 100,
+    });
+
+    // Monthly breakdown
+    const monthly = await QrRedemption.findAll({
+      where: { admin_id: { [Op.in]: scannerIds }, coupon_name: coupon.title },
+      attributes: [
+        [fn('DATE_FORMAT', col('created_at'), '%Y-%m'), 'month'],
+        [fn('COUNT', col('id')), 'count'],
+        [fn('SUM', col('purchase_amount')), 'revenue'],
+      ],
+      group: [fn('DATE_FORMAT', col('created_at'), '%Y-%m')],
+      order: [[fn('DATE_FORMAT', col('created_at'), '%Y-%m'), 'ASC']],
+      raw: true,
+    });
+
+    const totalRevenue = redemptions.reduce((s, r) => s + parseFloat(r.purchase_amount || 0), 0);
+
+    res.json({
+      success: true,
+      coupon: { ...coupon.toJSON(), sold, redeemed, totalRevenue },
+      monthly: monthly.map(m => ({ month: m.month, count: parseInt(m.count,10), revenue: parseFloat(m.revenue||0) })),
+      redemptions: redemptions.map(r => ({
+        id: r.id, couponName: r.coupon_name, purchaseAmount: r.purchase_amount,
+        scannerName: r.admin?.name || '—', scannedAt: r.createdAt,
+      })),
+    });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+// ── POST /vendor/email-summary ────────────────────────────────────────────────
+exports.emailSummary = async (req, res) => {
+  try {
+    if (!requireVendor(req, res)) return;
+    const vendorId = req.admin.vendor_id;
+    const vendor   = req.admin.vendor;
+
+    const scannerIds = await Admin.findAll({
+      where: { vendor_id: vendorId }, attributes: ['id'],
+    }).then(rows => rows.map(r => r.id));
+
+    const since = new Date(); since.setDate(since.getDate() - 7);
+
+    const [weeklyScans, weeklyRedemptions] = await Promise.all([
+      scannerIds.length ? QrScanLog.count({ where: { admin_id: { [Op.in]: scannerIds }, created_at: { [Op.gte]: since } } }) : 0,
+      scannerIds.length ? QrRedemption.findAll({ where: { admin_id: { [Op.in]: scannerIds }, created_at: { [Op.gte]: since } } }) : [],
+    ]);
+
+    const weeklyRevenue = weeklyRedemptions.reduce((s, r) => s + parseFloat(r.purchase_amount || 0), 0);
+
+    const { sendEmail } = require('../utils/email');
+    await sendEmail({
+      to: req.admin.email,
+      subject: `Weekly Summary — ${vendor?.name || 'Your Store'} | Shiry Kids`,
+      html: `
+        <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:24px">
+          <h2 style="color:#FF383C">Weekly Performance Report</h2>
+          <p>Hello <strong>${req.admin.name}</strong>, here's your summary for the last 7 days:</p>
+          <table style="width:100%;border-collapse:collapse;margin:20px 0">
+            <tr style="background:#FF383C;color:#fff">
+              <th style="padding:10px;text-align:left">Metric</th>
+              <th style="padding:10px;text-align:right">Value</th>
+            </tr>
+            <tr style="background:#fdf7f7">
+              <td style="padding:10px">Total Scans</td>
+              <td style="padding:10px;text-align:right"><strong>${weeklyScans}</strong></td>
+            </tr>
+            <tr>
+              <td style="padding:10px">Coupons Redeemed</td>
+              <td style="padding:10px;text-align:right"><strong>${weeklyRedemptions.length}</strong></td>
+            </tr>
+            <tr style="background:#fdf7f7">
+              <td style="padding:10px">Revenue Generated</td>
+              <td style="padding:10px;text-align:right"><strong>KD ${weeklyRevenue.toFixed(3)}</strong></td>
+            </tr>
+          </table>
+          <p style="color:#999;font-size:12px">Shiry Kids Vendor Dashboard · ${new Date().toLocaleDateString('en-GB')}</p>
+        </div>
+      `,
+    });
+
+    res.json({ success: true, message: 'Summary email sent to ' + req.admin.email });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
@@ -363,6 +541,11 @@ exports.analytics = async (req, res) => {
     const vendorId = req.admin.vendor_id;
     const { fn, col, literal } = require('sequelize');
 
+    // Optional date range filter
+    const dateFilter = {};
+    if (req.query.from) dateFilter[Op.gte] = new Date(req.query.from);
+    if (req.query.to)   dateFilter[Op.lte] = new Date(new Date(req.query.to).setHours(23,59,59,999));
+
     const scannerIds = await Admin.findAll({
       where: { vendor_id: vendorId }, attributes: ['id'],
     }).then(rows => rows.map(r => r.id));
@@ -372,9 +555,12 @@ exports.analytics = async (req, res) => {
     let monthlyRevenue = [];
     let topCoupons = [];
 
+    const baseWhere = { admin_id: { [Op.in]: scannerIds } };
+    if (Object.keys(dateFilter).length) baseWhere.created_at = dateFilter;
+
     if (scannerIds.length) {
       const revenueRaw = await QrRedemption.findAll({
-        where: { admin_id: { [Op.in]: scannerIds } },
+        where: baseWhere,
         attributes: [[fn('SUM', col('purchase_amount')), 'total']],
         raw: true,
       });
@@ -385,7 +571,7 @@ exports.analytics = async (req, res) => {
       since12.setMonth(since12.getMonth() - 11);
       since12.setDate(1);
       const monthRows = await QrRedemption.findAll({
-        where: { admin_id: { [Op.in]: scannerIds }, created_at: { [Op.gte]: since12 } },
+        where: Object.keys(dateFilter).length ? baseWhere : { admin_id: { [Op.in]: scannerIds }, created_at: { [Op.gte]: since12 } },
         attributes: [
           [fn('DATE_FORMAT', col('created_at'), '%Y-%m'), 'month'],
           [fn('SUM', col('purchase_amount')), 'revenue'],
@@ -403,7 +589,7 @@ exports.analytics = async (req, res) => {
 
       // Top coupons by redemption count
       const topRaw = await QrRedemption.findAll({
-        where: { admin_id: { [Op.in]: scannerIds } },
+        where: baseWhere,
         attributes: ['coupon_name', [fn('COUNT', col('id')), 'count'], [fn('SUM', col('purchase_amount')), 'revenue']],
         group: ['coupon_name'],
         order: [[fn('COUNT', col('id')), 'DESC']],

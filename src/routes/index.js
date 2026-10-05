@@ -66,7 +66,8 @@ router.get ('/orders/:id',          optionalUserAuth, order.getOrder);
 
 // ── Admin authenticated ───────────────────────────────────────────────────────
 router.get ('/auth/admin/me',       adminAuth, auth.adminMe);
-router.get ('/admin/stats',         adminAuth, admin.stats);
+router.get ('/admin/stats',              adminAuth, admin.stats);
+router.get ('/admin/vendor-performance', adminAuth, superAdminOnly, admin.vendorPerformance);
 
 // Roles & Admins — super admin only (role permissions include '*')
 const superAdminOnly = requirePermission();
@@ -142,7 +143,10 @@ router.get   ('/vendor/profile',                  adminAuth, canScanQr, vendor.g
 router.put   ('/vendor/profile/password',         adminAuth, canScanQr, vendor.changePassword);
 router.get   ('/vendor/analytics',                adminAuth, canScanQr, vendor.analytics);
 router.get   ('/vendor/notifications',            adminAuth, canScanQr, vendor.notifications);
+router.get   ('/vendor/customers',                adminAuth, canScanQr, vendor.customers);
 router.get   ('/vendor/coupons',                  adminAuth, canScanQr, vendor.coupons);
+router.get   ('/vendor/coupons/:id/detail',       adminAuth, canScanQr, vendor.couponDetail);
+router.post  ('/vendor/email-summary',            adminAuth, canScanQr, vendor.emailSummary);
 router.get   ('/vendor/redemptions',              adminAuth, canScanQr, vendor.redemptions);
 router.get   ('/vendor/scan-logs',                adminAuth, canScanQr, vendor.scanLogs);
 router.get   ('/vendor/scanner-stats',            adminAuth, canScanQr, vendor.scannerStats);
