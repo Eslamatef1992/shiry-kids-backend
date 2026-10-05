@@ -11,15 +11,15 @@ const sign = (id, type, secret = process.env.JWT_SECRET, exp = process.env.JWT_E
 exports.adminLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const admin = await Admin.findOne({ where: { email }, include: ['role'] });
+    const admin = await Admin.findOne({ where: { email }, include: ['role', 'vendor'] });
     if (!admin || !await bcrypt.compare(password, admin.password))
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     if (admin.status !== 'active')
       return res.status(403).json({ success: false, message: 'Account inactive' });
-    await admin.update({ last_login_at: new Date() });
+    try { await admin.update({ last_login_at: new Date() }); } catch (_) {}
     const token = sign(admin.id, 'admin');
     const refresh = sign(admin.id, 'admin', process.env.JWT_REFRESH_SECRET, process.env.JWT_REFRESH_EXPIRES_IN);
-    res.json({ success: true, token, refresh, admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } });
+    res.json({ success: true, token, refresh, admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role, vendor: admin.vendor, vendor_id: admin.vendor_id } });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
