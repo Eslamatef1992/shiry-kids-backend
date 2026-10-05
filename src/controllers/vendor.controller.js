@@ -1,5 +1,5 @@
 const bcrypt    = require('bcryptjs');
-const { Admin, Role, Coupon, CouponQrCode, QrScanLog, Vendor } = require('../models');
+const { Admin, Role, Coupon, CouponQrCode, QrScanLog, QrRedemption, Order, GuestOrder, User, Vendor } = require('../models');
 const { Op }    = require('sequelize');
 
 // Helper: ensure the calling admin has a vendor assigned
@@ -116,6 +116,70 @@ exports.createScanner = async (req, res) => {
       attributes: { exclude: ['password'] },
     });
     res.status(201).json({ success: true, data: full });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+// ── GET /vendor/redemptions ───────────────────────────────────────────────────
+// Returns all scanned redemptions for this vendor, with client details.
+exports.redemptions = async (req, res) => {
+  try {
+    if (!requireVendor(req, res)) return;
+    const vendorId = req.admin.vendor_id;
+
+    const scannerIds = await Admin.findAll({
+      where: { vendor_id: vendorId },
+      attributes: ['id'],
+    }).then(rows => rows.map(r => r.id));
+
+    if (!scannerIds.length) return res.json({ success: true, data: [] });
+
+    const redemptions = await QrRedemption.findAll({
+      where: { admin_id: { [Op.in]: scannerIds } },
+      include: [{ model: Admin, as: 'admin', attributes: ['id', 'name'] }],
+      order: [['created_at', 'DESC']],
+      limit: 200,
+    });
+
+    // Enrich with client name from order
+    const enriched = await Promise.all(redemptions.map(async (r) => {
+      const row = r.toJSON();
+      let clientName = '—';
+      let clientPhone = '—';
+      let purchasedAt = row.createdAt;
+
+      try {
+        if (row.order_id && row.order_type === 'order') {
+          const order = await Order.findByPk(row.order_id, {
+            include: [{ model: User, as: 'user', attributes: ['name', 'phone'] }],
+          });
+          if (order) {
+            clientName  = order.user?.name  || '—';
+            clientPhone = order.user?.phone || '—';
+            purchasedAt = order.createdAt;
+          }
+        } else if (row.order_id && row.order_type === 'guest_order') {
+          const go = await GuestOrder.findByPk(row.order_id, { attributes: ['name', 'phone', 'created_at'] });
+          if (go) {
+            clientName  = go.name  || '—';
+            clientPhone = go.phone || '—';
+            purchasedAt = go.createdAt;
+          }
+        }
+      } catch (_) {}
+
+      return {
+        id:             row.id,
+        couponName:     row.coupon_name,
+        purchaseAmount: row.purchase_amount,
+        scannerName:    row.admin?.name || '—',
+        clientName,
+        clientPhone,
+        purchasedAt,
+        scannedAt:      row.createdAt,
+      };
+    }));
+
+    res.json({ success: true, data: enriched });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
