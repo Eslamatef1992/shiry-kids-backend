@@ -169,6 +169,7 @@ exports.redemptions = async (req, res) => {
 
       return {
         id:             row.id,
+        qrCode:         row.qr_code,
         couponName:     row.coupon_name,
         purchaseAmount: row.purchase_amount,
         scannerName:    row.admin?.name || '—',
