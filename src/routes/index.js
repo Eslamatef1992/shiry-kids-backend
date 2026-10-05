@@ -137,12 +137,16 @@ const canScanQr = requirePermission('scan_qr');
 
 // ── Vendor Dashboard ──────────────────────────────────────────────────────────
 // Accessible to any admin with scan_qr permission (vendor-scoped scanners).
-router.get   ('/vendor/stats',        adminAuth, canScanQr, vendor.stats);
-router.get   ('/vendor/redemptions',  adminAuth, canScanQr, vendor.redemptions);
-router.get   ('/vendor/scan-logs',    adminAuth, canScanQr, vendor.scanLogs);
-router.get   ('/vendor/scanners',     adminAuth, canScanQr, vendor.listScanners);
-router.post  ('/vendor/scanners',     adminAuth, canScanQr, vendor.createScanner);
-router.delete('/vendor/scanners/:id', adminAuth, canScanQr, vendor.removeScanner);
+router.get   ('/vendor/stats',                    adminAuth, canScanQr, vendor.stats);
+router.get   ('/vendor/redemptions',              adminAuth, canScanQr, vendor.redemptions);
+router.get   ('/vendor/scan-logs',                adminAuth, canScanQr, vendor.scanLogs);
+router.get   ('/vendor/scanner-stats',            adminAuth, canScanQr, vendor.scannerStats);
+router.get   ('/vendor/daily-activity',           adminAuth, canScanQr, vendor.dailyActivity);
+router.get   ('/vendor/scanners',                 adminAuth, canScanQr, vendor.listScanners);
+router.post  ('/vendor/scanners',                 adminAuth, canScanQr, vendor.createScanner);
+router.put   ('/vendor/scanners/:id/password',    adminAuth, canScanQr, vendor.resetScannerPassword);
+router.put   ('/vendor/scanners/:id/status',      adminAuth, canScanQr, vendor.toggleScannerStatus);
+router.delete('/vendor/scanners/:id',             adminAuth, canScanQr, vendor.removeScanner);
 router.post('/qr/scan',             adminAuth, canScanQr,    qr.scan);
 router.post('/qr/check',            adminAuth, canScanQr,    qr.check);
 router.post('/qr/redeem',           adminAuth, canScanQr, qr.redeem);

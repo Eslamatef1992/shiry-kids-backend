@@ -16,8 +16,9 @@ const Admin = sequelize.define('Admin', {
   password: { type: DataTypes.STRING, allowNull: false },
   role_id:   { type: DataTypes.INTEGER, references: { model: 'roles', key: 'id' } },
   vendor_id: { type: DataTypes.INTEGER, allowNull: true, references: { model: 'vendors', key: 'id' } },
-  status:    { type: DataTypes.ENUM('active','inactive'), defaultValue: 'active' },
-  avatar:    { type: DataTypes.STRING, allowNull: true },
+  status:        { type: DataTypes.ENUM('active','inactive'), defaultValue: 'active' },
+  avatar:        { type: DataTypes.STRING, allowNull: true },
+  last_login_at: { type: DataTypes.DATE, allowNull: true },
 });
 
 // ── User ──────────────────────────────────────────────────────────────────────

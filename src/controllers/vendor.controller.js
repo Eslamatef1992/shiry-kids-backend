@@ -118,6 +118,108 @@ exports.listScanners = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
+// ── PUT /vendor/scanners/:id/password ────────────────────────────────────────
+exports.resetScannerPassword = async (req, res) => {
+  try {
+    if (!requireVendor(req, res)) return;
+    const scanner = await Admin.findOne({ where: { id: req.params.id, vendor_id: req.admin.vendor_id } });
+    if (!scanner) return res.status(404).json({ success: false, message: 'Scanner not found' });
+    const { password } = req.body;
+    if (!password || password.length < 6)
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    await scanner.update({ password: await bcrypt.hash(password, 12) });
+    res.json({ success: true, message: 'Password updated' });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+// ── PUT /vendor/scanners/:id/status ──────────────────────────────────────────
+exports.toggleScannerStatus = async (req, res) => {
+  try {
+    if (!requireVendor(req, res)) return;
+    const scanner = await Admin.findOne({ where: { id: req.params.id, vendor_id: req.admin.vendor_id } });
+    if (!scanner) return res.status(404).json({ success: false, message: 'Scanner not found' });
+    const newStatus = scanner.status === 'active' ? 'inactive' : 'active';
+    await scanner.update({ status: newStatus });
+    res.json({ success: true, status: newStatus });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+// ── GET /vendor/scanner-stats ─────────────────────────────────────────────────
+// Per-scanner breakdown: scans and redemptions count
+exports.scannerStats = async (req, res) => {
+  try {
+    if (!requireVendor(req, res)) return;
+    const vendorId = req.admin.vendor_id;
+
+    const scanners = await Admin.findAll({
+      where: { vendor_id: vendorId },
+      attributes: ['id', 'name'],
+    });
+    const scannerIds = scanners.map(s => s.id);
+    if (!scannerIds.length) return res.json({ success: true, data: [] });
+
+    const { fn, col, literal } = require('sequelize');
+
+    const scanCounts = await QrScanLog.findAll({
+      where: { admin_id: { [Op.in]: scannerIds } },
+      attributes: ['admin_id', [fn('COUNT', col('id')), 'total'], [fn('SUM', literal("CASE WHEN status='valid' THEN 1 ELSE 0 END")), 'scanned'], [fn('SUM', literal("CASE WHEN status='used' THEN 1 ELSE 0 END")), 'redeemed']],
+      group: ['admin_id'],
+      raw: true,
+    });
+
+    const countMap = {};
+    scanCounts.forEach(r => { countMap[r.admin_id] = r; });
+
+    res.json({
+      success: true,
+      data: scanners.map(s => ({
+        id:       s.id,
+        name:     s.name,
+        total:    parseInt(countMap[s.id]?.total    || 0, 10),
+        scanned:  parseInt(countMap[s.id]?.scanned  || 0, 10),
+        redeemed: parseInt(countMap[s.id]?.redeemed || 0, 10),
+      })),
+    });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+// ── GET /vendor/daily-activity ────────────────────────────────────────────────
+// Last 30 days daily scan counts for the vendor
+exports.dailyActivity = async (req, res) => {
+  try {
+    if (!requireVendor(req, res)) return;
+    const vendorId = req.admin.vendor_id;
+
+    const scannerIds = await Admin.findAll({
+      where: { vendor_id: vendorId }, attributes: ['id'],
+    }).then(rows => rows.map(r => r.id));
+
+    if (!scannerIds.length) return res.json({ success: true, data: [] });
+
+    const { fn, col, literal } = require('sequelize');
+    const since = new Date();
+    since.setDate(since.getDate() - 29);
+
+    const rows = await QrScanLog.findAll({
+      where: {
+        admin_id: { [Op.in]: scannerIds },
+        created_at: { [Op.gte]: since },
+      },
+      attributes: [
+        [fn('DATE', col('created_at')), 'day'],
+        [fn('COUNT', col('id')), 'total'],
+        [fn('SUM', literal("CASE WHEN status='valid' THEN 1 ELSE 0 END")), 'scanned'],
+        [fn('SUM', literal("CASE WHEN status='used' THEN 1 ELSE 0 END")), 'redeemed'],
+      ],
+      group: [fn('DATE', col('created_at'))],
+      order: [[fn('DATE', col('created_at')), 'ASC']],
+      raw: true,
+    });
+
+    res.json({ success: true, data: rows });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
 // ── POST /vendor/scanners ─────────────────────────────────────────────────────
 // Creates a scanner sub-account linked to the same vendor.
 exports.createScanner = async (req, res) => {

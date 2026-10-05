@@ -16,6 +16,7 @@ exports.adminLogin = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     if (admin.status !== 'active')
       return res.status(403).json({ success: false, message: 'Account inactive' });
+    await admin.update({ last_login_at: new Date() });
     const token = sign(admin.id, 'admin');
     const refresh = sign(admin.id, 'admin', process.env.JWT_REFRESH_SECRET, process.env.JWT_REFRESH_EXPIRES_IN);
     res.json({ success: true, token, refresh, admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } });
