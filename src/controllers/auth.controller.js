@@ -101,7 +101,14 @@ exports.updateAvatar = async (req, res) => {
 };
 
 exports.adminMe = async (req, res) => {
-  res.json({ success: true, admin: { id: req.admin.id, name: req.admin.name, email: req.admin.email, role: req.admin.role } });
+  res.json({ success: true, admin: {
+    id:        req.admin.id,
+    name:      req.admin.name,
+    email:     req.admin.email,
+    role:      req.admin.role,
+    vendor_id: req.admin.vendor_id,
+    vendor:    req.admin.vendor,
+  }});
 };
 
 // ── Forgot / reset password ───────────────────────────────────────────────────

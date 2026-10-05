@@ -1,5 +1,21 @@
 const { Order, GuestOrder, QrScanLog, QrRedemption, CouponQrCode, Coupon, Admin } = require('../models');
 
+// If the scanner admin is tied to a vendor, verify the coupon belongs to that vendor.
+// Returns true if allowed, false (+ sends 403) if not.
+const checkVendorAccess = (req, res, couponQr) => {
+  const vendorId = req.admin.vendor_id;
+  if (!vendorId) return true; // super admin / no vendor restriction
+  if (!couponQr || !couponQr.coupon) {
+    res.status(403).json({ success: false, message: 'This QR code does not belong to your vendor', status: 'forbidden' });
+    return false;
+  }
+  if (couponQr.coupon.vendor_id !== vendorId) {
+    res.status(403).json({ success: false, message: 'This QR code does not belong to your vendor', status: 'forbidden' });
+    return false;
+  }
+  return true;
+};
+
 exports.scan = async (req, res) => {
   try {
     const { qr_code } = req.body;
@@ -7,15 +23,18 @@ exports.scan = async (req, res) => {
 
     const orderNumber = qr_code.replace('SHIRY-ORDER-', '');
 
-    order = await Order.findOne({ where: { order_number: orderNumber } });
-    if (order) {
-      order_type = 'order';
-      status = order.payment_status === 'paid' ? (order.order_status === 'arrived' ? 'used' : 'valid') : 'not_found';
-    } else {
-      order = await GuestOrder.findOne({ where: { order_number: orderNumber } });
+    // Vendor-scoped scanners only scan coupons, not orders
+    if (!req.admin.vendor_id) {
+      order = await Order.findOne({ where: { order_number: orderNumber } });
       if (order) {
-        order_type = 'guest_order';
+        order_type = 'order';
         status = order.payment_status === 'paid' ? (order.order_status === 'arrived' ? 'used' : 'valid') : 'not_found';
+      } else {
+        order = await GuestOrder.findOne({ where: { order_number: orderNumber } });
+        if (order) {
+          order_type = 'guest_order';
+          status = order.payment_status === 'paid' ? (order.order_status === 'arrived' ? 'used' : 'valid') : 'not_found';
+        }
       }
     }
 
@@ -23,6 +42,7 @@ exports.scan = async (req, res) => {
     if (!order) {
       couponQr = await CouponQrCode.findOne({ where: { code: qr_code }, include: [{ model: Coupon, as: 'coupon' }] });
       if (couponQr) {
+        if (!checkVendorAccess(req, res, couponQr)) return;
         if (couponQr.status === 'used') status = 'used';
         else if (couponQr.status === 'assigned') status = 'valid';
         else status = 'not_found';
@@ -62,19 +82,23 @@ exports.check = async (req, res) => {
     let couponQr = null;
 
     const orderNumber = qr_code.replace('SHIRY-ORDER-', '');
-    order = await Order.findOne({ where: { order_number: orderNumber } });
-    if (order) {
-      order_type = 'order';
-      status = order.payment_status === 'paid'
-        ? (order.order_status === 'arrived' ? 'used' : 'valid')
-        : 'not_found';
-    } else {
-      order = await GuestOrder.findOne({ where: { order_number: orderNumber } });
+
+    // Vendor-scoped scanners only scan coupons, not orders
+    if (!req.admin.vendor_id) {
+      order = await Order.findOne({ where: { order_number: orderNumber } });
       if (order) {
-        order_type = 'guest_order';
+        order_type = 'order';
         status = order.payment_status === 'paid'
           ? (order.order_status === 'arrived' ? 'used' : 'valid')
           : 'not_found';
+      } else {
+        order = await GuestOrder.findOne({ where: { order_number: orderNumber } });
+        if (order) {
+          order_type = 'guest_order';
+          status = order.payment_status === 'paid'
+            ? (order.order_status === 'arrived' ? 'used' : 'valid')
+            : 'not_found';
+        }
       }
     }
 
@@ -84,6 +108,7 @@ exports.check = async (req, res) => {
         include: [{ model: Coupon, as: 'coupon' }],
       });
       if (couponQr) {
+        if (!checkVendorAccess(req, res, couponQr)) return;
         status = couponQr.status === 'used'     ? 'used'
                : couponQr.status === 'assigned' ? 'valid'
                : 'not_found';

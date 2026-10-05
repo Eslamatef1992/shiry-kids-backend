@@ -7,7 +7,7 @@ const adminAuth = async (req, res, next) => {
     if (!token) return res.status(401).json({ success: false, message: 'No token provided' });
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     if (decoded.type !== 'admin') return res.status(403).json({ success: false, message: 'Not authorized' });
-    req.admin = await Admin.findByPk(decoded.id, { include: ['role'] });
+    req.admin = await Admin.findByPk(decoded.id, { include: ['role', 'vendor'] });
     if (!req.admin || req.admin.status !== 'active') return res.status(401).json({ success: false, message: 'Account inactive' });
     next();
   } catch (e) {

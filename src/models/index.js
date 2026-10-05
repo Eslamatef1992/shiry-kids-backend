@@ -14,9 +14,10 @@ const Admin = sequelize.define('Admin', {
   name:     { type: DataTypes.STRING, allowNull: false },
   email:    { type: DataTypes.STRING, allowNull: false, unique: true },
   password: { type: DataTypes.STRING, allowNull: false },
-  role_id:  { type: DataTypes.INTEGER, references: { model: 'roles', key: 'id' } },
-  status:   { type: DataTypes.ENUM('active','inactive'), defaultValue: 'active' },
-  avatar:   { type: DataTypes.STRING, allowNull: true },
+  role_id:   { type: DataTypes.INTEGER, references: { model: 'roles', key: 'id' } },
+  vendor_id: { type: DataTypes.INTEGER, allowNull: true, references: { model: 'vendors', key: 'id' } },
+  status:    { type: DataTypes.ENUM('active','inactive'), defaultValue: 'active' },
+  avatar:    { type: DataTypes.STRING, allowNull: true },
 });
 
 // ── User ──────────────────────────────────────────────────────────────────────
@@ -341,8 +342,10 @@ const PhoneOtp = sequelize.define('PhoneOtp', {
 }, { tableName: 'phone_otps', underscored: true });
 
 // ── Associations ──────────────────────────────────────────────────────────────
-Admin.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
-Role.hasMany(Admin, { foreignKey: 'role_id' });
+Admin.belongsTo(Role,   { foreignKey: 'role_id',   as: 'role'   });
+Role.hasMany(Admin,    { foreignKey: 'role_id' });
+Admin.belongsTo(Vendor, { foreignKey: 'vendor_id', as: 'vendor' });
+Vendor.hasMany(Admin,  { foreignKey: 'vendor_id' });
 
 Product.belongsTo(Vendor, { foreignKey: 'vendor_id', as: 'vendor' });
 Product.belongsTo(Category, { foreignKey: 'category_id', as: 'category' });

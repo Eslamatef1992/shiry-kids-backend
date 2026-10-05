@@ -23,6 +23,7 @@ const qrGenerator = require('../controllers/qrGenerator.controller');
 const couponCategory = require('../controllers/couponCategory.controller');
 const report        = require('../controllers/report.controller');
 const qrBatch       = require('../controllers/qrBatch.controller');
+const vendor        = require('../controllers/vendor.controller');
 
 // ── Public ────────────────────────────────────────────────────────────────────
 router.post('/auth/admin/login',    auth.adminLogin);
@@ -133,6 +134,13 @@ router.patch('/admin/orders/:id',   adminAuth, canManageOrders, order.updateOrde
 
 // QR
 const canScanQr = requirePermission('scan_qr');
+
+// ── Vendor Dashboard ──────────────────────────────────────────────────────────
+// Accessible to any admin with scan_qr permission (vendor-scoped scanners).
+router.get   ('/vendor/stats',        adminAuth, canScanQr, vendor.stats);
+router.get   ('/vendor/scanners',     adminAuth, canScanQr, vendor.listScanners);
+router.post  ('/vendor/scanners',     adminAuth, canScanQr, vendor.createScanner);
+router.delete('/vendor/scanners/:id', adminAuth, canScanQr, vendor.removeScanner);
 router.post('/qr/scan',             adminAuth, canScanQr,    qr.scan);
 router.post('/qr/check',            adminAuth, canScanQr,    qr.check);
 router.post('/qr/redeem',           adminAuth, canScanQr, qr.redeem);

@@ -1,21 +1,23 @@
 const bcrypt = require('bcryptjs');
 const { Admin, Role, User, Vendor } = require('../models');
+const ADMIN_INCLUDE = [{ model: Role, as: 'role' }, { model: Vendor, as: 'vendor', attributes: ['id','name','name_ar','logo'] }];
 const { Op } = require('sequelize');
 
 // ── Admins ────────────────────────────────────────────────────────────────────
 exports.listAdmins = async (req, res) => {
   try {
-    const admins = await Admin.findAll({ include: ['role'], attributes: { exclude: ['password'] } });
+    const admins = await Admin.findAll({ include: ADMIN_INCLUDE, attributes: { exclude: ['password'] } });
     res.json({ success: true, data: admins });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
 exports.createAdmin = async (req, res) => {
   try {
-    const { name, email, password, role_id } = req.body;
+    const { name, email, password, role_id, vendor_id } = req.body;
     const hash = await bcrypt.hash(password, 12);
-    const admin = await Admin.create({ name, email, password: hash, role_id });
-    res.status(201).json({ success: true, data: { ...admin.toJSON(), password: undefined } });
+    const admin = await Admin.create({ name, email, password: hash, role_id, vendor_id: vendor_id || null });
+    const full  = await Admin.findByPk(admin.id, { include: ADMIN_INCLUDE, attributes: { exclude: ['password'] } });
+    res.status(201).json({ success: true, data: full });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
@@ -25,8 +27,12 @@ exports.updateAdmin = async (req, res) => {
     if (!admin) return res.status(404).json({ success: false, message: 'Not found' });
     const data = { ...req.body };
     if (data.password) data.password = await bcrypt.hash(data.password, 12);
+    else delete data.password;
+    // Allow explicitly clearing vendor_id
+    if ('vendor_id' in data) data.vendor_id = data.vendor_id || null;
     await admin.update(data);
-    res.json({ success: true, data: { ...admin.toJSON(), password: undefined } });
+    const full = await Admin.findByPk(admin.id, { include: ADMIN_INCLUDE, attributes: { exclude: ['password'] } });
+    res.json({ success: true, data: full });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
