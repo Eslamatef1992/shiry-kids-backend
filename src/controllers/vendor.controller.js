@@ -70,6 +70,39 @@ exports.stats = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
+// ── GET /vendor/scan-logs ─────────────────────────────────────────────────────
+// QrScanLog entries (every scan attempt) for this vendor's scanners.
+exports.scanLogs = async (req, res) => {
+  try {
+    if (!requireVendor(req, res)) return;
+    const vendorId = req.admin.vendor_id;
+
+    const scannerIds = await Admin.findAll({
+      where: { vendor_id: vendorId }, attributes: ['id'],
+    }).then(rows => rows.map(r => r.id));
+
+    if (!scannerIds.length) return res.json({ success: true, data: [] });
+
+    const logs = await QrScanLog.findAll({
+      where: { admin_id: { [Op.in]: scannerIds } },
+      include: [{ model: Admin, as: 'admin', attributes: ['id', 'name'] }],
+      order: [['created_at', 'DESC']],
+      limit: 300,
+    });
+
+    res.json({
+      success: true,
+      data: logs.map(l => ({
+        id:         l.id,
+        qrCode:     l.qr_code,
+        status:     l.status,
+        scannerName:l.admin?.name || '—',
+        scannedAt:  l.createdAt,
+      })),
+    });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
 // ── GET /vendor/scanners ──────────────────────────────────────────────────────
 // Lists all scanner sub-accounts for the calling admin's vendor.
 exports.listScanners = async (req, res) => {
