@@ -14,6 +14,7 @@ app.use(cors({
     process.env.LANDING_URL,
     'https://shirykids.com',
     'https://www.shirykids.com',
+    'https://vendor.sherykids.com',
     'http://localhost:3001',
     'http://localhost:5173',
     'http://localhost:5174',
