@@ -120,7 +120,19 @@ exports.createTapCharge = async (req, res) => {
 
     const { ok, data } = await createCharge(secretKey, payload);
     if (!ok || data.error) {
-      return res.status(502).json({ success: false, message: data?.error?.description || data?.message || 'Failed to create payment charge' });
+      // Log the full Tap error for debugging
+      console.error('[TAP CHARGE FAILED]', JSON.stringify({
+        order_id, order_type, method,
+        token_id: token_id || null,
+        tap_status: data?.status,
+        tap_error: data?.error,
+        tap_message: data?.message,
+      }));
+      return res.status(502).json({
+        success: false,
+        message: data?.error?.description || data?.message || 'Failed to create payment charge',
+        code: data?.error?.code || null,
+      });
     }
 
     await order.update({ tap_charge_id: data.id });
