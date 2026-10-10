@@ -36,6 +36,7 @@ router.post('/auth/send-otp',          auth.sendOtp);
 router.post('/auth/verify-otp',        auth.verifyOtp);
 router.post('/auth/reset-password',    auth.resetPassword);
 router.get ('/settings/public',     settings.public);
+router.get ('/app/version',         settings.appVersion);
 router.get ('/cms/:slug',           cms.get);
 router.get ('/discount-coupons/validate/:code', dc.validate);
 router.get ('/categories',          category.list);
