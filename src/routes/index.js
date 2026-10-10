@@ -67,10 +67,12 @@ router.get ('/orders/:id',          optionalUserAuth, order.getOrder);
 // ── Admin authenticated ───────────────────────────────────────────────────────
 router.get ('/auth/admin/me',       adminAuth, auth.adminMe);
 router.get ('/admin/stats',              adminAuth, admin.stats);
-router.get ('/admin/vendor-performance', adminAuth, superAdminOnly, admin.vendorPerformance);
 
 // Roles & Admins — super admin only (role permissions include '*')
 const superAdminOnly = requirePermission();
+
+router.get  ('/admin/vendor-performance',   adminAuth, superAdminOnly, admin.vendorPerformance);
+router.post ('/admin/coupons/bulk-upload',  adminAuth, superAdminOnly, uploadExcel.single('file'), admin.bulkUploadCoupons);
 
 // Roles
 router.get   ('/roles',             adminAuth, superAdminOnly, admin.listRoles);
@@ -145,7 +147,9 @@ router.get   ('/vendor/analytics',                adminAuth, canScanQr, vendor.a
 router.get   ('/vendor/notifications',            adminAuth, canScanQr, vendor.notifications);
 router.get   ('/vendor/customers',                adminAuth, canScanQr, vendor.customers);
 router.get   ('/vendor/coupons',                  adminAuth, canScanQr, vendor.coupons);
+router.get   ('/vendor/coupons/low-stock',        adminAuth, canScanQr, vendor.lowStock);
 router.get   ('/vendor/coupons/:id/detail',       adminAuth, canScanQr, vendor.couponDetail);
+router.get   ('/vendor/redemptions/map',          adminAuth, canScanQr, vendor.redemptionMap);
 router.post  ('/vendor/email-summary',            adminAuth, canScanQr, vendor.emailSummary);
 router.get   ('/vendor/redemptions',              adminAuth, canScanQr, vendor.redemptions);
 router.get   ('/vendor/scan-logs',                adminAuth, canScanQr, vendor.scanLogs);

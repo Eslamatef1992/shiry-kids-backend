@@ -704,3 +704,47 @@ exports.removeScanner = async (req, res) => {
     res.json({ success: true, message: 'Scanner removed' });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
+
+// ── GET /vendor/redemptions/map ───────────────────────────────────────────────
+// Returns redemptions with GPS coords for this vendor (for map view).
+exports.redemptionMap = async (req, res) => {
+  try {
+    if (!requireVendor(req, res)) return;
+    const vendorId = req.admin.vendor_id;
+
+    // Get scanner admin IDs for this vendor
+    const scanners = await Admin.findAll({ where: { vendor_id: vendorId }, attributes: ['id'] });
+    const scannerIds = scanners.map(s => s.id);
+
+    const rows = await QrRedemption.findAll({
+      where: {
+        admin_id: { [Op.in]: scannerIds },
+        lat: { [Op.not]: null },
+        lng: { [Op.not]: null },
+      },
+      attributes: ['id', 'coupon_name', 'purchase_amount', 'lat', 'lng', 'createdAt'],
+      order: [['createdAt', 'DESC']],
+      limit: 500,
+    });
+
+    res.json({ success: true, data: rows });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+// ── GET /vendor/coupons/low-stock ─────────────────────────────────────────────
+// Returns coupons where remaining stock is below threshold (default 10).
+exports.lowStock = async (req, res) => {
+  try {
+    if (!requireVendor(req, res)) return;
+    const vendorId = req.admin.vendor_id;
+    const threshold = parseInt(req.query.threshold) || 10;
+
+    const coupons = await Coupon.findAll({
+      where: { vendor_id: vendorId, stock: { [Op.lte]: threshold, [Op.gte]: 0 }, status: 'active' },
+      attributes: ['id', 'title', 'stock', 'price'],
+      order: [['stock', 'ASC']],
+    });
+
+    res.json({ success: true, data: coupons, threshold });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};

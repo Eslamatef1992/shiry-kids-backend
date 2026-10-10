@@ -180,7 +180,7 @@ exports.check = async (req, res) => {
 // ── Redeem a used QR code (super admin only) ──────────────────────────────────
 exports.redeem = async (req, res) => {
   try {
-    const { qr_code } = req.body;
+    const { qr_code, lat, lng } = req.body;
     if (!qr_code) return res.status(400).json({ success: false, message: 'qr_code is required' });
 
     // Must not already be redeemed
@@ -230,6 +230,8 @@ exports.redeem = async (req, res) => {
       purchase_amount,
       order_id,
       order_type,
+      lat:  lat  ? parseFloat(lat)  : null,
+      lng:  lng  ? parseFloat(lng)  : null,
     });
 
     const redeemedAt = redemption.created_at || redemption.createdAt;

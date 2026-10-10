@@ -332,6 +332,8 @@ const QrRedemption = sequelize.define('QrRedemption', {
   purchase_amount: { type: DataTypes.DECIMAL(10, 3), allowNull: true },
   order_id:        { type: DataTypes.INTEGER, allowNull: true },
   order_type:      { type: DataTypes.ENUM('order', 'guest_order'), allowNull: true },
+  lat:             { type: DataTypes.DECIMAL(10, 7), allowNull: true },
+  lng:             { type: DataTypes.DECIMAL(10, 7), allowNull: true },
 }, { tableName: 'qr_redemptions', underscored: true });
 
 // ── Phone OTP ─────────────────────────────────────────────────────────────────

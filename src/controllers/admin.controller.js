@@ -276,3 +276,51 @@ exports.vendorPerformance = async (req, res) => {
     res.json({ success: true, data });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
+
+// ── POST /admin/coupons/bulk-upload ───────────────────────────────────────────
+// Accepts an xlsx file and creates coupons in bulk.
+// Expected columns: title, title_ar, price, original_price, stock, vendor_id,
+//                   description, description_ar, category, expiry_date
+exports.bulkUploadCoupons = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const xlsx = require('xlsx');
+    const workbook = xlsx.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = xlsx.utils.sheet_to_json(sheet);
+
+    if (!rows.length) return res.status(400).json({ success: false, message: 'Excel file is empty' });
+
+    const { Coupon } = require('../models');
+    const created = [];
+    const errors  = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      try {
+        if (!r.title || !r.price || !r.stock) {
+          errors.push({ row: i + 2, reason: 'Missing required fields (title, price, stock)' });
+          continue;
+        }
+        const coupon = await Coupon.create({
+          title:          String(r.title),
+          title_ar:       r.title_ar ? String(r.title_ar) : null,
+          price:          parseFloat(r.price),
+          original_price: r.original_price ? parseFloat(r.original_price) : null,
+          stock:          parseInt(r.stock),
+          vendor_id:      r.vendor_id ? parseInt(r.vendor_id) : null,
+          description:    r.description ? String(r.description) : null,
+          description_ar: r.description_ar ? String(r.description_ar) : null,
+          category:       r.category ? String(r.category) : null,
+          expiry_date:    r.expiry_date ? new Date(r.expiry_date) : null,
+          status:         'active',
+        });
+        created.push(coupon.id);
+      } catch (err) {
+        errors.push({ row: i + 2, reason: err.message });
+      }
+    }
+
+    res.json({ success: true, created: created.length, errors });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
