@@ -134,7 +134,7 @@ exports.stats = async (req, res) => {
     const [
       totalOrders, totalGuestOrders, todayOrders, todayGuestOrders,
       totalUsers, totalVendors, totalProducts, totalCoupons,
-      revenueRow, todayRevenueRow, guestRevenueRow, pendingOrders,
+      revenueRow, todayRevenueRow, guestRevenueRow, todayGuestRevenueRow, pendingOrders,
     ] = await Promise.all([
       Order.count(),
       GuestOrder.count(),
@@ -147,6 +147,7 @@ exports.stats = async (req, res) => {
       Order.sum('total', { where: { payment_status: 'paid' } }),
       Order.sum('total', { where: { payment_status: 'paid', created_at: { [Op.gte]: today } } }),
       GuestOrder.sum('total', { where: { payment_status: 'paid' } }),
+      GuestOrder.sum('total', { where: { payment_status: 'paid', created_at: { [Op.gte]: today } } }),
       Order.count({ where: { payment_status: 'pending' } }),
     ]);
 
@@ -227,8 +228,11 @@ exports.stats = async (req, res) => {
       totalProducts,
       totalCoupons,
       revenue: (revenueRow || 0) + (guestRevenueRow || 0),
+      registeredRevenue: revenueRow || 0,
       guestRevenue: guestRevenueRow || 0,
-      todayRevenue: todayRevenueRow || 0,
+      todayRevenue: (todayRevenueRow || 0) + (todayGuestRevenueRow || 0),
+      todayRegisteredRevenue: todayRevenueRow || 0,
+      todayGuestRevenue: todayGuestRevenueRow || 0,
       monthlyOrders,
       orderStatusCounts: statusMap,
       mostSellingCoupon: mostSellingCoupon ? { ...mostSellingCoupon, image: addBase(mostSellingCoupon.image) } : null,
