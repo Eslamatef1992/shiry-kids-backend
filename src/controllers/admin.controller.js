@@ -227,6 +227,7 @@ exports.stats = async (req, res) => {
       totalProducts,
       totalCoupons,
       revenue: (revenueRow || 0) + (guestRevenueRow || 0),
+      guestRevenue: guestRevenueRow || 0,
       todayRevenue: todayRevenueRow || 0,
       monthlyOrders,
       orderStatusCounts: statusMap,
