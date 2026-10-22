@@ -550,55 +550,75 @@ exports.analytics = async (req, res) => {
       where: { vendor_id: vendorId }, attributes: ['id'],
     }).then(rows => rows.map(r => r.id));
 
-    // Total revenue (sum of purchase_amount from redemptions)
+    // Revenue = valid scans × coupon price (accurate, ignores NULL purchase_amount)
     let totalRevenue = 0;
     let monthlyRevenue = [];
     let topCoupons = [];
 
-    const baseWhere = { admin_id: { [Op.in]: scannerIds } };
-    if (Object.keys(dateFilter).length) baseWhere.created_at = dateFilter;
+    const { sequelize } = require('../models');
+    const scannerIdList = scannerIds.join(',') || '0';
 
     if (scannerIds.length) {
-      const revenueRaw = await QrRedemption.findAll({
-        where: baseWhere,
-        attributes: [[fn('SUM', col('purchase_amount')), 'total']],
-        raw: true,
-      });
-      totalRevenue = parseFloat(revenueRaw[0]?.total || 0);
+      // Total revenue: join scan logs → coupon_qr_codes → coupons to get price per scan
+      let revenueQuery = `
+        SELECT COALESCE(SUM(c.price), 0) AS total
+        FROM qr_scan_logs sl
+        JOIN coupon_qr_codes qr ON qr.code = sl.qr_code
+        JOIN coupons c ON c.id = qr.coupon_id
+        WHERE sl.admin_id IN (${scannerIdList})
+          AND sl.status = 'valid'
+          AND c.vendor_id = ${vendorId}
+      `;
+      if (req.query.from) revenueQuery += ` AND sl.created_at >= '${new Date(req.query.from).toISOString()}'`;
+      if (req.query.to)   revenueQuery += ` AND sl.created_at <= '${new Date(new Date(req.query.to).setHours(23,59,59,999)).toISOString()}'`;
+
+      const [revenueRows] = await sequelize.query(revenueQuery);
+      totalRevenue = parseFloat(revenueRows[0]?.total || 0);
 
       // Monthly revenue — last 12 months
       const since12 = new Date();
       since12.setMonth(since12.getMonth() - 11);
       since12.setDate(1);
-      const monthRows = await QrRedemption.findAll({
-        where: Object.keys(dateFilter).length ? baseWhere : { admin_id: { [Op.in]: scannerIds }, created_at: { [Op.gte]: since12 } },
-        attributes: [
-          [fn('DATE_FORMAT', col('created_at'), '%Y-%m'), 'month'],
-          [fn('SUM', col('purchase_amount')), 'revenue'],
-          [fn('COUNT', col('id')), 'count'],
-        ],
-        group: [fn('DATE_FORMAT', col('created_at'), '%Y-%m')],
-        order: [[fn('DATE_FORMAT', col('created_at'), '%Y-%m'), 'ASC']],
-        raw: true,
-      });
+      const monthQuery = `
+        SELECT DATE_FORMAT(sl.created_at, '%Y-%m') AS month,
+               COALESCE(SUM(c.price), 0) AS revenue,
+               COUNT(sl.id) AS cnt
+        FROM qr_scan_logs sl
+        JOIN coupon_qr_codes qr ON qr.code = sl.qr_code
+        JOIN coupons c ON c.id = qr.coupon_id
+        WHERE sl.admin_id IN (${scannerIdList})
+          AND sl.status = 'valid'
+          AND c.vendor_id = ${vendorId}
+          AND sl.created_at >= '${since12.toISOString()}'
+        GROUP BY month
+        ORDER BY month ASC
+      `;
+      const [monthRows] = await sequelize.query(monthQuery);
       monthlyRevenue = monthRows.map(r => ({
         month:   r.month,
         revenue: parseFloat(r.revenue || 0),
-        count:   parseInt(r.count   || 0, 10),
+        count:   parseInt(r.cnt || 0, 10),
       }));
 
-      // Top coupons by redemption count
-      const topRaw = await QrRedemption.findAll({
-        where: baseWhere,
-        attributes: ['coupon_name', [fn('COUNT', col('id')), 'count'], [fn('SUM', col('purchase_amount')), 'revenue']],
-        group: ['coupon_name'],
-        order: [[fn('COUNT', col('id')), 'DESC']],
-        limit: 10,
-        raw: true,
-      });
-      topCoupons = topRaw.map(r => ({
+      // Top coupons by scan count
+      const topQuery = `
+        SELECT c.title AS coupon_name,
+               COUNT(sl.id) AS cnt,
+               COALESCE(SUM(c.price), 0) AS revenue
+        FROM qr_scan_logs sl
+        JOIN coupon_qr_codes qr ON qr.code = sl.qr_code
+        JOIN coupons c ON c.id = qr.coupon_id
+        WHERE sl.admin_id IN (${scannerIdList})
+          AND sl.status = 'valid'
+          AND c.vendor_id = ${vendorId}
+        GROUP BY c.id, c.title
+        ORDER BY cnt DESC
+        LIMIT 10
+      `;
+      const [topRows] = await sequelize.query(topQuery);
+      topCoupons = topRows.map(r => ({
         name:    r.coupon_name || '—',
-        count:   parseInt(r.count   || 0, 10),
+        count:   parseInt(r.cnt || 0, 10),
         revenue: parseFloat(r.revenue || 0),
       }));
     }
