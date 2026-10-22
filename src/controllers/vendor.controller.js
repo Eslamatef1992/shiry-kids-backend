@@ -161,7 +161,7 @@ exports.scannerStats = async (req, res) => {
     const { fn, col, literal } = require('sequelize');
 
     const scanCounts = await QrScanLog.findAll({
-      where: { admin_id: { [Op.in]: scannerIds } },
+      where: { admin_id: { [Op.in]: scannerIds }, status: { [Op.in]: ['valid', 'used'] } },
       attributes: ['admin_id', [fn('COUNT', col('id')), 'total'], [fn('SUM', literal("CASE WHEN status='valid' THEN 1 ELSE 0 END")), 'scanned'], [fn('SUM', literal("CASE WHEN status='used' THEN 1 ELSE 0 END")), 'redeemed']],
       group: ['admin_id'],
       raw: true,
@@ -623,10 +623,10 @@ exports.analytics = async (req, res) => {
       }));
     }
 
-    // Scan success rate
-    const totalScans      = scannerIds.length ? await QrScanLog.count({ where: { admin_id: { [Op.in]: scannerIds } } }) : 0;
+    // Scan counts — exclude failed/invalid attempts
     const successfulScans = scannerIds.length ? await QrScanLog.count({ where: { admin_id: { [Op.in]: scannerIds }, status: 'valid' } }) : 0;
-    const redeemedScans   = scannerIds.length ? await QrScanLog.count({ where: { admin_id: { [Op.in]: scannerIds }, status: 'used' } }) : 0;
+    const redeemedScans   = scannerIds.length ? await QrScanLog.count({ where: { admin_id: { [Op.in]: scannerIds }, status: 'used'  } }) : 0;
+    const totalScans      = successfulScans + redeemedScans;
 
     res.json({
       success: true,
