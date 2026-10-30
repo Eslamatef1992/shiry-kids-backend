@@ -134,6 +134,7 @@ router.get('/admin/reports/sales', adminAuth, canViewReports, report.salesReport
 const canManageOrders = requirePermission('manage_orders');
 router.get('/admin/orders',         adminAuth, canManageOrders, order.adminListOrders);
 router.get('/admin/orders/guest',   adminAuth, canManageOrders, order.adminListGuestOrders);
+router.get('/admin/orders/:id',     adminAuth, canManageOrders, order.adminGetOrder);
 router.patch('/admin/orders/:id',   adminAuth, canManageOrders, order.updateOrderStatus);
 
 // QR

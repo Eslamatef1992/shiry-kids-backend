@@ -257,6 +257,26 @@ exports.adminListGuestOrders = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
+exports.adminGetOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type = 'order' } = req.query;
+    const Model = type === 'guest_order' ? GuestOrder : Order;
+    const orderType = type === 'guest_order' ? 'guest_order' : 'order';
+
+    const o = await Model.findByPk(id, { include: type === 'order' ? ['user'] : [] });
+    if (!o) return res.status(404).json({ success: false, message: 'Not found' });
+
+    const coupon_qr_codes = await CouponQrCode.findAll({
+      where: { order_id: id, order_type: orderType },
+      attributes: ['id', 'coupon_id', 'image', 'code', 'status', 'assigned_at'],
+      include: [{ model: Coupon, as: 'coupon', attributes: ['id', 'title'] }],
+    });
+
+    res.json({ success: true, data: { ...o.toJSON(), coupon_qr_codes } });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
 exports.updateOrderStatus = async (req, res) => {
   try {
     const { type = 'order' } = req.query;
