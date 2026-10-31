@@ -128,7 +128,9 @@ router.delete('/coupons/:id/qr-codes/:qrId', adminAuth, canManageCoupons, coupon
 
 // Reports (admin)
 const canViewReports = requirePermission('manage_orders', 'manage_coupons');
-router.get('/admin/reports/sales', adminAuth, canViewReports, report.salesReport);
+router.get('/admin/reports/sales',              adminAuth, canViewReports, report.salesReport);
+router.get('/admin/reports/ui-coupons',         adminAuth, canViewReports, report.uiCoupons);
+router.get('/admin/reports/ui-coupons/:id',     adminAuth, canViewReports, report.uiCouponDetail);
 
 // Orders (admin)
 const canManageOrders = requirePermission('manage_orders');
