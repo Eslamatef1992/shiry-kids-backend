@@ -138,6 +138,7 @@ router.get('/admin/orders',         adminAuth, canManageOrders, order.adminListO
 router.get('/admin/orders/guest',   adminAuth, canManageOrders, order.adminListGuestOrders);
 router.get('/admin/orders/:id',     adminAuth, canManageOrders, order.adminGetOrder);
 router.patch('/admin/orders/:id',   adminAuth, canManageOrders, order.updateOrderStatus);
+router.post('/admin/orders/:id/refund', adminAuth, canManageOrders, order.refundOrder);
 
 // QR
 const canScanQr = requirePermission('scan_qr');

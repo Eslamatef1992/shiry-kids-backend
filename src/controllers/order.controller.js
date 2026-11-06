@@ -1,4 +1,4 @@
-const { Order, GuestOrder, User, DiscountCoupon, Product, Coupon, CouponQrCode } = require('../models');
+const { Order, GuestOrder, User, DiscountCoupon, Product, Coupon, CouponQrCode, QrScanLog, Admin } = require('../models');
 const { paginate, paginateResponse, generateOrderNumber, generateQRCode } = require('../utils/helpers');
 const { sendOrderConfirmationEmail } = require('../utils/email');
 const { Op } = require('sequelize');
@@ -114,6 +114,16 @@ exports.createOrder = async (req, res) => {
 exports.createGuestOrder = async (req, res) => {
   try {
     const { name, phone, address, items, payment_method, discount_code } = req.body;
+
+    // Validate required guest fields
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Name is required' });
+    }
+    const phoneDigits = (phone || '').replace(/\D/g, '');
+    if (phoneDigits.length !== 8) {
+      return res.status(400).json({ success: false, message: 'A valid 8-digit phone number is required' });
+    }
+
     const { resolved, subtotal, errors } = await resolveOrderItems(items);
     if (resolved.length === 0) {
       return res.status(400).json({ success: false, message: errors[0] || 'No valid items found in order' });
@@ -137,7 +147,7 @@ exports.createGuestOrder = async (req, res) => {
     const qr_data = `SHIRY-ORDER-${order_number}`;
     const qr_code = await generateQRCode(qr_data);
     const order = await GuestOrder.create({
-      order_number, name: name || 'Guest', phone: phone || 'N/A', address: address || 'N/A',
+      order_number, name: name.trim(), phone: phoneDigits, address: address || '',
       items: resolved, subtotal, discount, delivery_fees, total, payment_method, discount_code, qr_code,
     });
     // Same rule: only assign QR codes immediately for COD.
@@ -203,12 +213,28 @@ exports.adminListOrders = async (req, res) => {
     const where = {};
     if (payment_status) where.payment_status = payment_status;
     if (order_status) where.order_status = order_status;
-    if (search) where.order_number = { [Op.like]: `%${search}%` };
+    if (search) where[Op.or] = [
+      { order_number: { [Op.like]: `%${search}%` } },
+      { phone: { [Op.like]: `%${search}%` } },
+    ];
+
+    // For registered orders, also search by user phone
+    const userWhere = search ? { phone: { [Op.like]: `%${search}%` } } : null;
+    const orderWhere = search ? {
+      [Op.or]: [
+        { order_number: { [Op.like]: `%${search}%` } },
+        { '$user.phone$': { [Op.like]: `%${search}%` } },
+      ]
+    } : {};
+    if (payment_status) orderWhere.payment_status = payment_status;
+    if (order_status) orderWhere.order_status = order_status;
+
+    const guestWhere = { ...where };
 
     // Fetch registered orders + guest orders together
     const [{ rows: orderRows }, { rows: guestRows }] = await Promise.all([
-      Order.findAndCountAll({ where, include: ['user'], ...paginate(page, limit), order: [['created_at','DESC']] }),
-      GuestOrder.findAndCountAll({ where, ...paginate(page, limit), order: [['created_at','DESC']] }),
+      Order.findAndCountAll({ where: orderWhere, include: [{ association: 'user' }], ...paginate(page, limit), order: [['created_at','DESC']], subQuery: false }),
+      GuestOrder.findAndCountAll({ where: guestWhere, ...paginate(page, limit), order: [['created_at','DESC']] }),
     ]);
 
     // Collect all unique coupon/product IDs from items to enrich with vendor names
@@ -248,10 +274,15 @@ exports.adminListOrders = async (req, res) => {
 
 exports.adminListGuestOrders = async (req, res) => {
   try {
-    const { page=1, limit=20, payment_status, order_status } = req.query;
+    const { page=1, limit=20, payment_status, order_status, search } = req.query;
     const where = {};
     if (payment_status) where.payment_status = payment_status;
     if (order_status) where.order_status = order_status;
+    if (search) where[Op.or] = [
+      { order_number: { [Op.like]: `%${search}%` } },
+      { phone: { [Op.like]: `%${search}%` } },
+      { name: { [Op.like]: `%${search}%` } },
+    ];
     const { count, rows } = await GuestOrder.findAndCountAll({ where, ...paginate(page, limit), order: [['created_at','DESC']] });
     res.json({ success: true, data: rows, meta: paginateResponse(count, page, limit) });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
@@ -273,7 +304,26 @@ exports.adminGetOrder = async (req, res) => {
       include: [{ model: Coupon, as: 'coupon', attributes: ['id', 'title'] }],
     });
 
-    res.json({ success: true, data: { ...o.toJSON(), coupon_qr_codes } });
+    // Fetch scan logs for each QR code (valid scans only)
+    const codes = coupon_qr_codes.map(q => q.code).filter(Boolean);
+    const scanLogs = codes.length ? await QrScanLog.findAll({
+      where: { qr_code: codes, status: 'valid' },
+      attributes: ['qr_code', 'created_at'],
+      include: [{ model: Admin, as: 'admin', attributes: ['id', 'name'] }],
+      order: [['created_at', 'DESC']],
+    }) : [];
+
+    // Map scan info onto each QR code
+    const scanMap = {};
+    scanLogs.forEach(log => { if (!scanMap[log.qr_code]) scanMap[log.qr_code] = log.toJSON(); });
+
+    const enriched = coupon_qr_codes.map(qr => ({
+      ...qr.toJSON(),
+      scanned_at: scanMap[qr.code]?.created_at || null,
+      scanned_by: scanMap[qr.code]?.admin?.name || null,
+    }));
+
+    res.json({ success: true, data: { ...o.toJSON(), coupon_qr_codes: enriched } });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
@@ -285,5 +335,30 @@ exports.updateOrderStatus = async (req, res) => {
     if (!order) return res.status(404).json({ success: false, message: 'Not found' });
     await order.update(req.body);
     res.json({ success: true, data: order });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+// POST /admin/orders/:id/refund
+// body: { type: 'order'|'guest', refund_coupons: true|false }
+exports.refundOrder = async (req, res) => {
+  try {
+    const { type = 'order', refund_coupons = false } = req.body;
+    const Model = type === 'guest' ? GuestOrder : Order;
+    const order = await Model.findByPk(req.params.id);
+    if (!order) return res.status(404).json({ success: false, message: 'Not found' });
+
+    // Mark order as refunded
+    await order.update({ payment_status: 'refunded' });
+
+    // If coupon refund — reset all assigned QR codes back to unassigned
+    if (refund_coupons) {
+      const orderType = type === 'guest' ? 'guest_order' : 'order';
+      await CouponQrCode.update(
+        { status: 'unassigned', order_id: null, order_type: null, scanned_at: null, scanned_by: null },
+        { where: { order_id: order.id, order_type: orderType } }
+      );
+    }
+
+    res.json({ success: true, message: refund_coupons ? 'Refunded and coupons released' : 'Refunded' });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };

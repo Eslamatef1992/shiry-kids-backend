@@ -169,7 +169,7 @@ const GuestOrder = sequelize.define('GuestOrder', {
   delivery_fees:  { type: DataTypes.DECIMAL(10,3), defaultValue: 1.5 },
   total:          { type: DataTypes.DECIMAL(10,3), allowNull: false },
   payment_method: { type: DataTypes.ENUM('knet','visa','cod'), allowNull: false },
-  payment_status: { type: DataTypes.ENUM('paid','pending','failed'), defaultValue: 'pending' },
+  payment_status: { type: DataTypes.ENUM('paid','pending','failed','refunded'), defaultValue: 'pending' },
   order_status:   { type: DataTypes.ENUM('processing','shipped','arrived','cancelled'), defaultValue: 'processing' },
   qr_code:        { type: DataTypes.TEXT('long'), allowNull: true },
   discount_code:  { type: DataTypes.STRING, allowNull: true },
